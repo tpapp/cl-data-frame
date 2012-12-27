@@ -27,7 +27,11 @@
 
 (deftest data-frame-creation (data-frame-creation)
   (let ((df (data-frame :vector v :symbols s)))
+    (assert-equalp '(:vector :symbols)
+        (column-names df))
+    (assert-equalp (vector v s)
+        (columns-vector df))
     (assert-equalp `(:vector ,v :symbols ,s)
         (columns-plist df))
-    (assert-equalp '(:vector :symbols)
-        (column-names df))))
+    (assert-equalp `((:vector . ,v) (:symbols . ,s))
+        (columns-alist df))))
