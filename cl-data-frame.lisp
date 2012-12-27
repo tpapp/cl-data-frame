@@ -1,7 +1,13 @@
 ;;; -*- Mode:Lisp; Syntax:ANSI-Common-Lisp; Coding:utf-8 -*-
 
 (cl:defpackage #:cl-data-frame
-  (:use #:cl #:alexandria #:anaphora #:let-plus #:cl-slice #:cl-slice-dev)
+  (:use
+   #:cl
+   #:alexandria
+   #:anaphora
+   #:let-plus
+   #:cl-slice
+   #:cl-slice-dev)
   (:export
    ;; ordered keys
    #:ordered-keys
