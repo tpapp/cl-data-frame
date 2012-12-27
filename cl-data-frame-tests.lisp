@@ -42,4 +42,5 @@
         (columns-plist (slice df t #(:vector))))
     (assert-equalp `(:vector ,(slice v b))
         (columns-plist (slice df b #(0))))
-    ))
+    (assert-equalp (slice v b)
+        (slice df b :vector))))

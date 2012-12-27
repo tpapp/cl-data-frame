@@ -102,11 +102,14 @@
                    :columns (coerce (mapcar #'cdr alist) 'vector))))
 
 (defmethod slice ((data-frame data-frame) &rest slices)
-  (let+ (((slice-row &optional (slice-col t)) slices)
+  (let+ (((row-slice &optional (column-slice t)) slices)
          ((&slots-r/o ordered-keys columns) data-frame)
-         (slice-col (canonical-representation ordered-keys slice-col)))
-    (make-instance 'data-frame
-                   :ordered-keys (slice ordered-keys slice-col)
-                   :columns (map 'vector (lambda (column)
-                                           (slice column slice-row))
-                                 (slice columns slice-col)))))
+         (column-slice (canonical-representation ordered-keys column-slice))
+         (columns (slice columns column-slice))
+         ((&flet slice-column (column)
+            (slice column row-slice))))
+    (if (singleton-representation? column-slice)
+        (slice-column columns)
+        (make-instance 'data-frame
+                       :ordered-keys (slice ordered-keys column-slice)
+                       :columns (map 'vector #'slice-column columns)))))
