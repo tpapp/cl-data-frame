@@ -10,7 +10,27 @@
    #:cl-slice-dev)
   (:export
    ;; data frame
-   ))
+   #:duplicate-key
+   #:key-not-found
+   #:data-frame
+   #:columns-vector
+   #:column-length
+   #:data-frame-length
+   #:column
+   #:data-frame-keys
+   #:data-frame-alist
+   #:data-frame-plist
+   #:copy-data-frame
+   #:add-column!
+   #:add-columns!
+   #:map-rows
+   #:select-rows
+   #:with-map-rows
+   #:with-select-rows
+   #:map-rows-and-add
+   #:with-map-rows-and-add
+   #:map-rows-and-add!
+   #:with-map-rows-and-add!))
 
 (cl:in-package #:cl-data-frame)
 
@@ -138,11 +158,11 @@ ensure that it is an adjustable array."
 
 (defun data-frame-alist (data-frame)
   "Key-column pairs as an alist."
-  (map 'list #'cons (column-keys data-frame) (columns-vector data-frame)))
+  (map 'list #'cons (data-frame-keys data-frame) (columns-vector data-frame)))
 
 (defun data-frame-plist (data-frame)
   "Key-column pairs as a plist."
-  (alist-plist (columns-alist data-frame)))
+  (alist-plist (data-frame-alist data-frame)))
 
 (defun data-frame (&rest keys-and-columns-plist)
   "Create a data from from KEYs and COLUMNs, given as a plist.  Columns are
