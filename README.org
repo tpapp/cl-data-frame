@@ -2,6 +2,8 @@
 
 * Data frames for Common Lisp
 
+/I need to write this, for now just look at the unit tests which have plenty of examples./
+
 * Reporting bugs
 
 Please report bugs using the [[https://github.com/tpapp/cl-data-frame/issues][issue tracker]].
