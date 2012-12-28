@@ -21,6 +21,7 @@
    #:data-frame-alist
    #:data-frame-plist
    #:copy-data-frame
+   #:add-columns
    #:add-column!
    #:add-columns!
    #:map-rows
@@ -136,12 +137,14 @@ TABLE maps keys to indexes, starting from zero."
 (defun make-data-frame (ordered-keys columns)
   "Create a data frame from ORDERED-KEYS and COLUMNS (can be any kind of
 sequence).  FOR INTERNAL USE.  Always creates a copy of COLUMNS in order to
-ensure that it is an adjustable array."
-  (make-instance 'data-frame
-                 :ordered-keys ordered-keys
-                 :columns (make-array (length columns)
-                                      :adjustable t
-                                      :initial-contents columns)))
+ensure that it is an adjustable array with a fill pointer."
+  (let ((n-columns (length columns)))
+    (make-instance 'data-frame
+                   :ordered-keys ordered-keys
+                   :columns (make-array n-columns
+                                        :adjustable t
+                                        :fill-pointer n-columns
+                                        :initial-contents columns))))
 
 (defun data-frame-length (data-frame)
   "Length of DATA-FRAME (number of rows)."
@@ -186,7 +189,7 @@ checked for matching length."
 (defun add-column! (data-frame key column)
   "Modify DATA-FRAME by adding COLUMN with KEY.  Return DATA-FRAME."
   (let+ (((&slots ordered-keys columns) data-frame))
-    (assert (= (column-length columns) (data-frame-length data-frame)))
+    (assert (= (column-length column) (data-frame-length data-frame)))
     (add-key! ordered-keys key)
     (vector-push-extend column columns))
   data-frame)
@@ -203,7 +206,7 @@ Return DATA-FRAME."
   "Return a new data frame with keys and columns added.  Does not modify
 DATA-FRAME."
   (aprog1 (copy-data-frame data-frame)
-    (apply #'add-columns! data-frame key-and-column-plist)))
+    (apply #'add-columns! it key-and-column-plist)))
 
 
 
