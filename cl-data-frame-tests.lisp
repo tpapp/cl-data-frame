@@ -53,14 +53,12 @@
     (assert-equalp product
         (map-rows df '(:a :b) #'*))
     (assert-equalp product
-        (with-map-rows (df)
-                       ((a :a)
-                        (b :b))
+        (mapping-rows (df ((a :a)
+                           (b :b)))
           (* a b)))
     (assert-equalp #*011
         (select-rows df '(:a :b) #'predicate))
     (assert-equalp #*011
-        (with-select-rows (df)
-                          ((a :a)
-                           (b :b))
+        (selecting-rows (df ((a :a)
+                             (b :b)))
           (predicate a b)))))

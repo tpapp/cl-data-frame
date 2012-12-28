@@ -274,7 +274,7 @@ KEYS and FUNCTION (using BODY) in functions that map rows.  NOT EXPORTED."
   (let+ (((&values variables keys) (process-bindings bindings)))
     `(,keys (lambda ,variables ,@body))))
 
-(defmacro mapping-rows ((data-frame &key (element-type t)) bindings
+(defmacro mapping-rows ((data-frame bindings &key (element-type t))
                          &body body)
   "Map rows of DATA-FRAME and return the resulting column (with the given
 ELEMENT-TYPE).  See MAP-ROWS.
@@ -285,7 +285,7 @@ the VARIABLEs for the columns designated by KEYs."
              ,@(keys-and-lambda-from-bindings bindings body)
              :element-type ,element-type))
 
-(defmacro selecting-rows ((data-frame) bindings &body body)
+(defmacro selecting-rows ((data-frame bindings) &body body)
   "Map rows using predicate and return the resulting bit vector (see
 SELECT-ROWS).
 
@@ -311,8 +311,8 @@ KEYS selects columns, the rows of which are passed on to FUNCTION."
        (,function-used data-frame result-key
                        (map-rows data-frame keys function
                                  :element-type element-type)))
-     (defmacro ,macro ((data-frame key &key (element-type t))
-                       bindings &body body)
+     (defmacro ,macro ((data-frame key bindings &key (element-type t))
+                       &body body)
        ,(format nil
 "Map rows of DATA-FRAME and add the resulting column (with the given
 ELEMENT-TYPE), designated by KEY.  ~A
