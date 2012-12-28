@@ -21,10 +21,9 @@
 ;;; NOT EXPORTED.
 
 (defstruct (ordered-keys (:copier nil))
-  "Representation of ordered keys.  KEYS contains a list of symbols (the
-keys), TABLE is a hash table for quicker lookup.  Either one could be
-regenerated from the other, this is maintained as an invariant."
-  (keys nil :type list :read-only t)
+  "Representation of ordered keys.
+
+TABLE maps keys to indexes, starting from zero."
   (table (make-hash-table :test #'eq) :type hash-table :read-only t))
 
 (define-condition duplicate-key (error)
@@ -44,7 +43,10 @@ regenerated from the other, this is maintained as an invariant."
 
 (defun key-list (ordered-keys)
   "List of all keys."
-  (ordered-keys-keys ordered-keys))
+  (mapcar #'car
+          (sort (hash-table-alist (ordered-keys-table ordered-keys))
+                #'<=
+                :key #'cdr)))
 
 (defun key-index (ordered-keys key)
   "Return the index for KEY."
@@ -61,7 +63,7 @@ regenerated from the other, this is maintained as an invariant."
 (defun add-key! (ordered-keys key)
   "Modify ORDERED-KEYS by adding KEY."
   (check-type key symbol)
-  (let+ (((&structure ordered-keys- keys table) ordered-keys)
+  (let+ (((&structure ordered-keys- table) ordered-keys)
          ((&values &ign present?) (gethash key table)))
     (when present?
       (error 'duplicate-key :key key))
@@ -74,9 +76,8 @@ regenerated from the other, this is maintained as an invariant."
     (map nil (curry #'add-key! it) keys)))
 
 (defun copy-ordered-keys (ordered-keys)
-  (let+ (((&structure ordered-keys- keys table) ordered-keys))
-    (make-ordered-keys :keys (copy-list keys)
-                       :table (copy-hash-table table))))
+  (let+ (((&structure ordered-keys- table) ordered-keys))
+    (make-ordered-keys :table (copy-hash-table table))))
 
 (defun add-keys (ordered-keys &rest keys)
   (aprog1 (copy-ordered-keys ordered-keys)
@@ -98,11 +99,6 @@ regenerated from the other, this is maintained as an invariant."
 
 
 
-(defgeneric column-length (column)
-  (:documentation "Return the length of column.")
-  (:method ((column vector))
-    (length column)))
-
 (defclass data-frame ()
   ((ordered-keys
     :initarg :ordered-keys
@@ -111,6 +107,21 @@ regenerated from the other, this is maintained as an invariant."
     :initarg :columns
     :type vector
     :reader columns-vector)))
+
+(defgeneric column-length (column)
+  (:documentation "Return the length of column.")
+  (:method ((column vector))
+    (length column)))
+
+(defun make-data-frame (ordered-keys columns)
+  "Create a data frame from ORDERED-KEYS and COLUMNS (can be any kind of
+sequence).  FOR INTERNAL USE.  Always creates a copy of COLUMNS in order to
+ensure that it is an adjustable array."
+  (make-instance 'data-frame
+                 :ordered-keys ordered-keys
+                 :columns (make-array (length columns)
+                                      :adjustable t
+                                      :initial-contents columns)))
 
 (defun data-frame-length (data-frame)
   "Length of DATA-FRAME (number of rows)."
@@ -121,25 +132,21 @@ regenerated from the other, this is maintained as an invariant."
   (let+ (((&slots-r/o ordered-keys columns) data-frame))
     (aref columns (key-index ordered-keys key))))
 
-(defun column-keys (data-frame)
+(defun data-frame-keys (data-frame)
+  "List of keys."
   (key-list (slot-value data-frame 'ordered-keys)))
 
-(defun columns-alist (data-frame)
+(defun data-frame-alist (data-frame)
+  "Key-column pairs as an alist."
   (map 'list #'cons (column-keys data-frame) (columns-vector data-frame)))
 
-(defun columns-plist (data-frame)
+(defun data-frame-plist (data-frame)
+  "Key-column pairs as a plist."
   (alist-plist (columns-alist data-frame)))
 
-(defun make-data-frame (ordered-keys columns)
-  "Create a data frame from ORDERED-KEYS and COLUMNS (can be any kind of
-sequence).  For internal use."
-  (make-instance 'data-frame
-                 :ordered-keys ordered-keys
-                 :columns (make-array (length columns)
-                                      :adjustable t
-                                      :initial-contents columns)))
-
 (defun data-frame (&rest keys-and-columns-plist)
+  "Create a data from from KEYs and COLUMNs, given as a plist.  Columns are
+checked for matching length."
   (assert keys-and-columns-plist () "Can't create an empty data frame.")
   (let* ((alist (plist-alist keys-and-columns-plist))
          (columns (mapcar #'cdr alist))
@@ -151,9 +158,10 @@ sequence).  For internal use."
                      columns)))
 
 (defun copy-data-frame (data-frame)
+  "Create a copy of a data frame."
   (let+ (((&slots-r/o ordered-keys columns) data-frame))
     (make-data-frame (copy-ordered-keys ordered-keys)
-                     columns)))
+                     columns))) ; NOTE: make-data-frame copies columns
 
 (defun add-column! (data-frame key column)
   "Modify DATA-FRAME by adding COLUMN with KEY.  Return DATA-FRAME."
@@ -172,8 +180,14 @@ Return DATA-FRAME."
   data-frame)
 
 (defun add-columns (data-frame &rest key-and-column-plist)
+  "Return a new data frame with keys and columns added.  Does not modify
+DATA-FRAME."
   (aprog1 (copy-data-frame data-frame)
-    (apply #'add-columns data-frame key-and-column-plist)))
+    (apply #'add-columns! data-frame key-and-column-plist)))
+
+
+
+;;; implementation of SLICE for DATA-FRAME
 
 (defmethod slice ((data-frame data-frame) &rest slices)
   (let+ (((row-slice &optional (column-slice t)) slices)
@@ -189,7 +203,13 @@ Return DATA-FRAME."
 
 ;;; TODO: (setf slice)
 
+
+
+;;; mapping rows and adding columns
+
 (defun map-rows (data-frame keys function &key (element-type t))
+  "Map rows using FUNCTION, on the columns corresponding to KEYS.  Return the
+result with the given ELEMENT-TYPE."
   (let ((columns (map 'list (curry #'column data-frame) keys))
         (length (data-frame-length data-frame)))
     (aprog1 (make-array length :element-type element-type)
@@ -200,16 +220,22 @@ Return DATA-FRAME."
                                (ref column index))
                              columns)))))))
 
-(defun select-rows (data-frame keys function)
+(defun select-rows (data-frame keys predicate)
+  "Return a bit-vector containing the result of calling PREDICATE on rows of
+the columns corresponding to KEYS (0 for NIL, 1 otherwise)."
   (map-rows data-frame keys (compose (lambda (flag)
                                        (if flag 1 0))
-                                     function)
+                                     predicate)
             :element-type 'bit-vector))
 
 (defun process-bindings (bindings)
-  "Return forms for variables and keys as two values, for use in macros of
-this library.  BINDINGS is a list of (VARIABLE &optional KEY) forms, where
-VARIABLE is a symbol and KEY is evaluated."
+  "Return forms for variables and keys as two values, for use in macros.
+
+BINDINGS is a list of (VARIABLE &optional KEY) forms, where VARIABLE is a
+symbol and KEY is evaluated.  When KEY is not given, it is VARIABLE converted
+to a keyword.
+
+NOT EXPORTED."
   (let ((alist (mapcar (lambda+ ((variable
                                   &optional (key (make-keyword variable))))
                          (check-type variable symbol)
@@ -220,17 +246,27 @@ VARIABLE is a symbol and KEY is evaluated."
 
 (defun keys-and-lambda-from-bindings (bindings body)
   "Process bindings and return a form that can be spliced into the place of
-KEYS and FUNCTION (using BODY) in functions that map rows."
+KEYS and FUNCTION (using BODY) in functions that map rows.  NOT EXPORTED."
   (let+ (((&values variables keys) (process-bindings bindings)))
     `(,keys (lambda ,variables ,@body))))
 
 (defmacro with-map-rows ((data-frame &key (element-type t)) bindings
                          &body body)
+  "Map rows of DATA-FRAME and return the resulting column (with the given
+ELEMENT-TYPE).  See MAP-ROWS.
+
+BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to
+the VARIABLEs for the columns designated by KEYs."
   `(map-rows ,data-frame
              ,@(keys-and-lambda-from-bindings bindings body)
              :element-type ,element-type))
 
 (defmacro with-select-rows ((data-frame) bindings &body body)
+  "Map rows using predicate and return the resulting bit vector (see
+SELECT-ROWS).
+
+BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to
+the VARIABLEs for the columns designated by KEYs."
   `(select-rows ,data-frame
                 ,@(keys-and-lambda-from-bindings bindings body)))
 
@@ -254,7 +290,7 @@ KEYS selects columns, the rows of which are passed on to FUNCTION."
      (defmacro ,macro ((data-frame key &key (element-type t))
                        bindings &body body)
        ,(format nil
-"Map columns of DATA-FRAME and add the resulting column (with the given
+"Map rows of DATA-FRAME and add the resulting column (with the given
 ELEMENT-TYPE), designated by KEY.  ~A
 
 BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to
