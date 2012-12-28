@@ -5,6 +5,7 @@
    #:cl
    #:alexandria
    #:anaphora
+   #:array-operations
    #:let-plus
    #:cl-slice
    #:cl-slice-dev)
@@ -18,9 +19,10 @@
    ;; data frame
    #:data-frame
    #:columns-vector
-   #:column-names
    #:columns-alist
-   #:columns-plist))
+   #:columns-plist
+   #:column-keys
+   #:column))
 
 (cl:in-package #:cl-data-frame)
 
@@ -86,11 +88,16 @@
   ((ordered-keys :initarg :ordered-keys)
    (columns :initarg :columns :type vector :reader columns-vector)))
 
-(defun column-names (data-frame)
+(defun column (data-frame key)
+  "Return the column of DATA-FRAME corresponding to KEYS."
+  (let+ (((&slots-r/o ordered-keys columns) data-frame))
+    (aref columns (key-index ordered-keys key))))
+
+(defun column-keys (data-frame)
   (key-list (slot-value data-frame 'ordered-keys)))
 
 (defun columns-alist (data-frame)
-  (map 'list #'cons (column-names data-frame) (columns-vector data-frame)))
+  (map 'list #'cons (column-keys data-frame) (columns-vector data-frame)))
 
 (defun columns-plist (data-frame)
   (alist-plist (columns-alist data-frame)))
@@ -113,3 +120,5 @@
         (make-instance 'data-frame
                        :ordered-keys (slice ordered-keys column-slice)
                        :columns (map 'vector #'slice-column columns)))))
+
+;;; TODO: (setf slice)
