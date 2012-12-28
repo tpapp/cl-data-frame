@@ -62,3 +62,78 @@
         (selecting-rows (df ((a :a)
                              (b :b)))
           (predicate a b)))))
+
+;;;
+
+(defsuite data-frame-add (data-frame))
+
+(deffixture data-frame-add (@body)
+  (let* ((plist1 '(:a #(1 2 3)))
+         (plist2 '(:b #(4 5 6)))
+         (plist12 (append plist1 plist2)))
+    @body))
+
+(defmacro test-add (add-function plist1 plist2 append?)
+  "Macro for generating the following test:
+
+  1. create a data frame using plist1,
+
+  2. add plist2 using add-function to get a second data frame,
+
+  3. test that the first data frame is uncorrupted if append? is nil, or
+     equivalent the concatenated plist otherwise,
+
+  4. test that the second data frame is equivalent to the concatenated plist.
+
+This is a pretty comprehensive test of the add-column family of functions,
+destructive or non-destructive."
+  (with-unique-names (df df2 plist12)
+    (once-only (plist1 plist2)
+      `(let* ((,df (apply #'data-frame ,plist1))
+              (,df2 (apply ,add-function ,df ,plist2))
+              (,plist12 (append ,plist1 ,plist2)))
+         (assert-equal (if ,append?
+                           ,plist12
+                           ,plist1)
+             (data-frame-plist ,df))
+         (assert-equal ,plist12
+             (data-frame-plist ,df2))))))
+
+(deftest add-column (data-frame-add)
+    (test-add #'add-columns plist1 plist2 nil)
+    (test-add #'add-column! plist1 plist2 t)
+    (test-add #'add-columns! plist1 plist2 t))
+
+(deftest add-map (data-frame-add)
+  (let* ((plist3 '(:c #(4 10 18)))
+         (plist123 (append plist12 plist3)))
+    ;; non-destructive
+    (let* ((df (apply #'data-frame plist12))
+           (df2 (add-map-rows df '(:a :b) #'* :c))
+           (df3 (add-mapping-rows (df :c
+                                   ((a :a)
+                                    (b :b)))
+                  (* a b))))
+      (assert-equalp plist12
+          (data-frame-plist df))
+      (assert-equalp plist123
+          (data-frame-plist df2))
+      (assert-equalp plist123
+          (data-frame-plist df3)))
+    ;; destructive, function
+    (let* ((df (apply #'data-frame plist12))
+           (df2 (add-map-rows! df '(:a :b) #'* :c)))
+      (assert-equalp plist123
+          (data-frame-plist df))
+      (assert-equalp plist123
+          (data-frame-plist df2)))
+    ;; destructive, macro
+    (let* ((df (apply #'data-frame plist12))
+           (df2 (add-mapping-rows! (df :c
+                                    ((a :a)
+                                     (b :b)))
+                  (* a b))))
+      (assert-equalp plist123
+          (data-frame-plist df))
+      (assert-equalp plist123
+          (data-frame-plist df2)))))
