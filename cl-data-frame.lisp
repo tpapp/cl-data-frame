@@ -25,12 +25,12 @@
    #:add-columns!
    #:map-rows
    #:select-rows
-   #:with-map-rows
-   #:with-select-rows
-   #:map-rows-and-add
-   #:with-map-rows-and-add
-   #:map-rows-and-add!
-   #:with-map-rows-and-add!))
+   #:mapping-rows
+   #:selecting-rows
+   #:add-map-rows
+   #:add-mapping-rows
+   #:add-map-rows!
+   #:add-mapping-rows!))
 
 (cl:in-package #:cl-data-frame)
 
@@ -248,6 +248,10 @@ the columns corresponding to KEYS (0 for NIL, 1 otherwise)."
                                      predicate)
             :element-type 'bit-vector))
 
+
+
+;;; macros
+
 (defun process-bindings (bindings)
   "Return forms for variables and keys as two values, for use in macros.
 
@@ -270,7 +274,7 @@ KEYS and FUNCTION (using BODY) in functions that map rows.  NOT EXPORTED."
   (let+ (((&values variables keys) (process-bindings bindings)))
     `(,keys (lambda ,variables ,@body))))
 
-(defmacro with-map-rows ((data-frame &key (element-type t)) bindings
+(defmacro mapping-rows ((data-frame &key (element-type t)) bindings
                          &body body)
   "Map rows of DATA-FRAME and return the resulting column (with the given
 ELEMENT-TYPE).  See MAP-ROWS.
@@ -281,7 +285,7 @@ the VARIABLEs for the columns designated by KEYs."
              ,@(keys-and-lambda-from-bindings bindings body)
              :element-type ,element-type))
 
-(defmacro with-select-rows ((data-frame) bindings &body body)
+(defmacro selecting-rows ((data-frame) bindings &body body)
   "Map rows using predicate and return the resulting bit vector (see
 SELECT-ROWS).
 
@@ -323,10 +327,10 @@ the VARIABLEs for the columns designated by KEYs."
 
 (define-map-add-function-and-macro
     "Return a new data-frame."
-    (map-rows-and-add add-columns)
-    with-map-rows-and-add)
+    (add-map-rows add-columns)
+    add-mapping-rows)
 
 (define-map-add-function-and-macro
     "Modify (and also return) DATA-FRAME."
-    (map-rows-and-add! add-column!)
-    with-map-rows-and-add!)
+    (add-map-rows! add-column!)
+    add-mapping-rows!)
