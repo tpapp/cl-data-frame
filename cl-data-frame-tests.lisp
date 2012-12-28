@@ -46,13 +46,21 @@
         (slice df b :vector))))
 
 (deftest data-frame-map (data-frame-basics)
-  (let ((df (data-frame :a #(2 3 5)
-                        :b #(7 11 13)))
-        (product #(14 33 65)))
+  (let+ ((df (data-frame :a #(2 3 5)
+                         :b #(7 11 13)))
+         (product #(14 33 65))
+         ((&flet predicate (a b) (<= 30 (* a b)))))
     (assert-equalp product
         (map-rows df '(:a :b) #'*))
     (assert-equalp product
         (with-map-rows (df)
                        ((a :a)
                         (b :b))
-          (* a b)))))
+          (* a b)))
+    (assert-equalp #*011
+        (select-rows df '(:a :b) #'predicate))
+    (assert-equalp #*011
+        (with-select-rows (df)
+                          ((a :a)
+                           (b :b))
+          (predicate a b)))))
