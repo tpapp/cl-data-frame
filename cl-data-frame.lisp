@@ -274,6 +274,8 @@ NOT EXPORTED."
 (defun keys-and-lambda-from-bindings (bindings body)
   "Process bindings and return a form that can be spliced into the place of
 KEYS and FUNCTION (using BODY) in functions that map rows.  NOT EXPORTED."
+  (unless body
+    (warn "Empty function body."))
   (let+ (((&values variables keys) (process-bindings bindings)))
     `(,keys (lambda ,variables ,@body))))
 

@@ -137,3 +137,11 @@ destructive or non-destructive."
           (data-frame-plist df))
       (assert-equalp plist123
           (data-frame-plist df2)))))
+
+(deftest empty-body-warnings (data-frame-add)
+  (assert-condition warning
+      (macroexpand '(mapping-rows (nil nil))))
+  (assert-condition warning
+      (macroexpand '(add-mapping-rows (nil nil nil))))
+  (assert-condition warning
+      (macroexpand '(add-mapping-rows! (nil nil nil)))))
