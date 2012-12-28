@@ -5,7 +5,11 @@
   :maintainer "Tamas Papp <tkpapp@gmail.com>"
   :author "Tamas Papp <tkpapp@gmail.com>"
   :licence "BOOST"
-  :depends-on (#:alexandria #:anaphora #:cl-slice #:let-plus)
+  :depends-on (#:alexandria
+               #:anaphora
+               #:array-operations
+               #:cl-slice
+               #:let-plus)
   :serial t
   :components ((:file "cl-data-frame")))
 
@@ -15,6 +19,7 @@
   :maintainer "Tamas Papp <tkpapp@gmail.com>"
   :author "Tamas Papp <tkpapp@gmail.com>"
   :licence "BOOST"
-  :depends-on (#:cl-data-frame #:clunit)
+  :depends-on (#:cl-data-frame
+               #:clunit)
   :serial t
   :components ((:file "cl-data-frame-tests")))
