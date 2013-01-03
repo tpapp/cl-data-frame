@@ -13,6 +13,8 @@
    #:duplicate-key
    #:key-not-found
    #:data-frame
+   #:alist-data-frame
+   #:plist-data-frame
    #:columns-vector
    #:column-length
    #:data-frame-length
@@ -167,18 +169,29 @@ ensure that it is an adjustable array with a fill pointer."
   "Key-column pairs as a plist."
   (alist-plist (data-frame-alist data-frame)))
 
-(defun data-frame (&rest keys-and-columns-plist)
-  "Create a data from from KEYs and COLUMNs, given as a plist.  Columns are
-checked for matching length."
-  (assert keys-and-columns-plist () "Can't create an empty data frame.")
-  (let* ((alist (plist-alist keys-and-columns-plist))
-         (columns (mapcar #'cdr alist))
+(defun alist-data-frame (key-and-column-alist)
+  "Create a data from an alist of KEYs and COLUMNs.  Columns are checked for matching length."
+  (assert key-and-column-alist () "Can't create an empty data frame.")
+  (let* ((columns (mapcar #'cdr key-and-column-alist))
          (length (column-length (car columns))))
     (assert (every (lambda (column)
                      (= length (column-length column)))
                    (cdr columns)))
-    (make-data-frame (ordered-keys (mapcar #'car alist))
+    (make-data-frame (ordered-keys (mapcar #'car key-and-column-alist))
                      columns)))
+
+(defun plist-data-frame (key-and-column-plist)
+  "Create a data from a plist of KEYs and COLUMNs.  Columns are checked for matching length."
+  (assert key-and-column-plist () "Can't create an empty data frame.")
+  (alist-data-frame (plist-alist key-and-column-plist)))
+
+(defun data-frame (&rest plist-or-alist)
+  "Create a data from a plist or alist of KEYs and COLUMNs.  Columns are checked for matching length.
+
+If the first argument is a CONS, the rest are assumed to be conses (hence an alist), otherwise the arguments are considered a PLIST."
+  (if (consp (car plist-or-alist))
+      (alist-data-frame plist-or-alist)
+      (plist-data-frame plist-or-alist)))
 
 (defun copy-data-frame (data-frame)
   "Create a copy of a data frame."
