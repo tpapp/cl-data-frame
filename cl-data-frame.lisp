@@ -50,7 +50,7 @@
       (if (<= (length elements) (/ length 2))
           (non-numeric-column-summary column)
           (let+ ((#(min q25 q50 q75 max)
-                   (clnu:quantiles elements #(0 0.25 0.5 0.75 1))))
+                   (clnu:quantiles elements #(0 1/4 1/2 3/4 1))))
             (make-numeric-vector-summary :length (length column)
                                          :real-count (length elements)
                                          :min min
