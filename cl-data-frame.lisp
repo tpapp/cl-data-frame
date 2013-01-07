@@ -1,11 +1,65 @@
 ;;; -*- Mode:Lisp; Syntax:ANSI-Common-Lisp; Coding:utf-8 -*-
 
+
+
+(cl:defpackage #:cl-data-frame.column
+  (:use #:cl
+        #:alexandria
+        #:anaphora
+        #:let-plus)
+  (:export
+   #:column-length
+   #:column-summary))
+
+(cl:in-package #:cl-data-frame.column)
+
+(defgeneric column-length (column)
+  (:documentation "Return the length of column.")
+  (:method ((column vector))
+    (length column)))
+
+(defstruct bit-vector-summary
+  "Summary of a bit vector."
+  (length 0 :type array-index :read-only t)
+  (count  0 :type array-index :read-only t))
+
+(defstruct numeric-vector-summary
+  "Summary of a numeric vector."
+  (length 0 :type array-index :read-only t)
+  (real-count 0 :type array-index :read-only t)
+  (min 0 :type real :read-only t)
+  (q25 0 :type real :read-only t)
+  (q50 0 :type real :read-only t)
+  (q75 0 :type real :read-only t)
+  (max 0 :type real :read-only t))
+
+(defgeneric column-summary (column)
+  (:documentation "Return an object that summarizes COLUMN of a DATA-FRAME.  Primarily intended for printing, not analysis, returned values should print nicely.")
+  (:method ((column bit-vector))
+    (make-bit-vector-summary :length (length column) :count (count 1 column)))
+  (:method ((column vector))
+    (let+ ((elements (loop for elt across column
+                           when (realp elt)
+                           collect elt))
+           (#(min q25 q50 q75 max) (clnu:quantiles elements #(0 0.25 0.5 0.75 1))))
+      (make-numeric-vector-summary :length (length column)
+                                   :real-count (length elements)
+                                   :min min
+                                   :q25 q25
+                                   :q50 q50
+                                   :q75 q75
+                                   :max max))))
+
+
+
+
 (cl:defpackage #:cl-data-frame
   (:use
    #:cl
    #:alexandria
    #:anaphora
    #:let-plus
+   #:cl-data-frame.column
    #:cl-slice
    #:cl-slice-dev)
   (:export
@@ -130,11 +184,6 @@ TABLE maps keys to indexes, starting from zero."
     :initarg :columns
     :type vector
     :reader columns-vector)))
-
-(defgeneric column-length (column)
-  (:documentation "Return the length of column.")
-  (:method ((column vector))
-    (length column)))
 
 (defun make-data-frame (ordered-keys columns)
   "Create a data frame from ORDERED-KEYS and COLUMNS (can be any kind of
@@ -352,3 +401,5 @@ the VARIABLEs for the columns designated by KEYs."
     "Modify (and also return) DATA-FRAME."
     (add-map-rows! add-column!)
     add-mapping-rows!)
+
+
