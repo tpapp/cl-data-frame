@@ -8,6 +8,7 @@
   :depends-on (#:alexandria
                #:anaphora
                #:array-operations
+               #:cl-num-utils
                #:cl-slice
                #:let-plus)
   :serial t
