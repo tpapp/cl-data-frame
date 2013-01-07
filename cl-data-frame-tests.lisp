@@ -8,7 +8,9 @@
    #:clunit
    #:let-plus
    #:cl-slice
-   #:cl-data-frame))
+   #:cl-data-frame)
+  (:export
+   #:run))
 
 (cl:in-package #:cl-data-frame-tests)
 
