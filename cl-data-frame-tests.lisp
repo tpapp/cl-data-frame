@@ -72,6 +72,11 @@
                              (b :b)))
           (predicate a b)))))
 
+(deftest print-object (data-frame-basics)
+  (let ((df (data-frame :a v :b b)))
+    (assert-true (with-output-to-string (stream)
+                   (print-object df stream)))))
+
 ;;;
 
 (defsuite data-frame-add (data-frame))
