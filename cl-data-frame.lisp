@@ -242,6 +242,14 @@ If the first argument is a CONS, the rest are assumed to be conses (hence an ali
       (alist-data-frame plist-or-alist)
       (plist-data-frame plist-or-alist)))
 
+(defmethod print-object ((data-frame data-frame) stream)
+  (print-unreadable-object (data-frame stream :type t)
+    (let ((alist (data-frame-alist data-frame)))
+      (format stream "~d x ~d" (length alist) (data-frame-length data-frame))
+      (loop for (key . column) in alist
+            do (format stream "~&  ~A  ~A"
+                       key (column-summary column))))))
+
 (defun copy-data-frame (data-frame)
   "Create a copy of a data frame."
   (let+ (((&slots-r/o ordered-keys columns) data-frame))
