@@ -33,23 +33,31 @@
   (q75 0 :type real :read-only t)
   (max 0 :type real :read-only t))
 
+(defun non-numeric-column-summary (column)
+  ;; FIXME need to write this
+  (declare (ignore column))
+  "column is not numeric")
+
 (defgeneric column-summary (column)
   (:documentation "Return an object that summarizes COLUMN of a DATA-FRAME.  Primarily intended for printing, not analysis, returned values should print nicely.")
   (:method ((column bit-vector))
     (make-bit-vector-summary :length (length column) :count (count 1 column)))
   (:method ((column vector))
-    (let+ ((elements (loop for elt across column
+    (let+ ((length (length column))
+           (elements (loop for elt across column
                            when (realp elt)
-                           collect elt))
-           (#(min q25 q50 q75 max) (clnu:quantiles elements #(0 0.25 0.5 0.75 1))))
-      (make-numeric-vector-summary :length (length column)
-                                   :real-count (length elements)
-                                   :min min
-                                   :q25 q25
-                                   :q50 q50
-                                   :q75 q75
-                                   :max max))))
-
+                           collect elt)))
+      (if (<= (length elements) (/ length 2))
+          (non-numeric-column-summary column)
+          (let+ ((#(min q25 q50 q75 max)
+                   (clnu:quantiles elements #(0 0.25 0.5 0.75 1))))
+            (make-numeric-vector-summary :length (length column)
+                                         :real-count (length elements)
+                                         :min min
+                                         :q25 q25
+                                         :q50 q50
+                                         :q75 q75
+                                         :max max))))))
 
 
 
