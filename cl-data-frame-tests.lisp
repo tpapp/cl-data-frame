@@ -43,7 +43,8 @@
   (let ((df (df :vector v :symbols s)))
     (assert-equalp `(:vector ,v) (as-plist (slice df t #(:vector))))
     (assert-equalp `(:vector ,(slice v b)) (as-plist (slice df b #(0))))
-    (assert-equalp (slice v b) (slice df b :vector))))
+    (assert-equalp (slice v b) (slice df b :vector))
+    (assert-equalp '(:vector 3 :symbols c) (as-plist (slice df 2 t)))))
 
 (deftest data-frame-map (data-frame-basics)
   (let+ ((df (df :a #(2 3 5)
