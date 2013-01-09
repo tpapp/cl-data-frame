@@ -327,6 +327,15 @@ TABLE maps keys to indexes, starting from zero."
             do (format stream "~&  ~A  ~A"
                        key column)))))
 
+(defmethod slice ((data-vector data-vector) &rest slices)
+  (let+ (((column-slice) slices)
+         ((&slots-r/o ordered-keys columns) data-vector)
+         (column-slice (canonical-representation ordered-keys column-slice)))
+    (if (singleton-representation? column-slice)
+        (aref columns column-slice)
+        (make-dv (slice ordered-keys column-slice)
+                 (slice columns column-slice)))))
+
 (define-data-subclass data-frame df)
 
 (defmethod initialize-instance :after ((data-frame data-frame) &rest initargs)
