@@ -60,7 +60,7 @@
 
 
 (cl:defpackage #:cl-data-frame
-  (:nicknames #:df)
+  (:nicknames #:data-frame)
   (:use
    #:cl
    #:alexandria
@@ -69,7 +69,6 @@
    #:cl-data-frame.column
    #:cl-slice
    #:cl-slice-dev)
-  (:shadow #:length)
   (:export
    ;; error messages for ordered keys
    #:duplicate-key
@@ -81,6 +80,9 @@
    #:copy
    #:as-alist
    #:as-plist
+   #:add-columns
+   #:add-column!
+   #:add-columns!
    ;; data-vector
    #:data-vector
    #:make-dv
@@ -95,19 +97,15 @@
    #:plist-df
    #:df
    #:matrix-df
-   ;; transformations for both data-vector and data-matrix
-   ;; #:add-columns
-   ;; #:add-column!
-   ;; #:add-columns!
-   ;; #:map-rows
-   ;; #:select-rows
-   ;; #:mapping-rows
-   ;; #:selecting-rows
-   ;; #:add-map-rows
-   ;; #:add-mapping-rows
-   ;; #:add-map-rows!
-   ;; #:add-mapping-rows!
-))
+   ;; transformations for data-frames
+   #:map-rows
+   #:select-rows
+   #:mapping-rows
+   #:selecting-rows
+   #:add-map-rows
+   #:add-mapping-rows
+   #:add-map-rows!
+   #:add-mapping-rows!))
 
 (cl:in-package #:cl-data-frame)
 
