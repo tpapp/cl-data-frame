@@ -186,7 +186,9 @@ TABLE maps keys to indexes, starting from zero."
   (hash-table-count (ordered-keys-table axis)))
 
 (defmethod canonical-representation ((axis ordered-keys) (slice symbol))
-  (key-index axis slice))
+  (if (eq slice t)
+      (canonical-range 0 (keys-count axis))
+      (key-index axis slice)))
 
 (defmethod slice ((ordered-keys ordered-keys) &rest slices)
   (let+ (((slice) slices))
