@@ -19,6 +19,17 @@
 (defun run (&optional interactive?)
   (run-suite 'data-frame :use-debugger interactive?))
 
+(defsuite data-vector (data-frame))
+
+(deftest data-vector-basics (data-vector)
+  (let ((dv (dv :a 1 :b 2 :c 3)))
+    (assert-equalp '(:a 1 :b 2 :c 3) (as-plist dv))
+    (assert-equalp #(1 2 3) (columns dv))
+    (assert-equalp #(:a :b :c) (keys dv))
+    (assert-equalp '((:a . 1) (:b . 2) (:c . 3)) (as-alist dv))
+    (assert-equalp '(:a 1 :b 2) (as-plist (slice dv #(:a :b))))
+    (assert-equalp 3 (slice dv :c))))
+
 (defsuite data-frame-basics (data-frame))
 
 (deffixture data-frame-basics (@body)
