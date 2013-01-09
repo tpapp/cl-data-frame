@@ -34,9 +34,8 @@
   (max 0 :type real :read-only t))
 
 (defun non-numeric-column-summary (column)
-  ;; FIXME need to write this
   (declare (ignore column))
-  "column is not numeric")
+  "column is not numeric FIXME need to implement")
 
 (defgeneric column-summary (column)
   (:documentation "Return an object that summarizes COLUMN of a DATA-FRAME.  Primarily intended for printing, not analysis, returned values should print nicely.")
@@ -60,8 +59,8 @@
                                          :max max))))))
 
 
-
 (cl:defpackage #:cl-data-frame
+  (:nicknames #:df)
   (:use
    #:cl
    #:alexandria
@@ -70,36 +69,46 @@
    #:cl-data-frame.column
    #:cl-slice
    #:cl-slice-dev)
+  (:shadow #:length)
   (:export
-   ;; data frame
+   ;; error messages for ordered keys
    #:duplicate-key
    #:key-not-found
+   ;; generic - both data-vector and data-frame
+   #:columns
+   #:keys
+   #:copy
+   #:as-alist
+   #:as-plist
+   ;; data-vector
+   #:data-vector
+   #:make-dv
+   #:alist-dv
+   #:plist-dv
+   #:dv
+   ;; data-frame
    #:data-frame
-   #:alist-data-frame
-   #:plist-data-frame
-   #:columns-vector
-   #:column-length
-   #:data-frame-length
-   #:column
-   #:data-frame-keys
-   #:data-frame-alist
-   #:data-frame-plist
-   #:copy-data-frame
-   #:add-columns
-   #:add-column!
-   #:add-columns!
-   #:map-rows
-   #:select-rows
-   #:mapping-rows
-   #:selecting-rows
-   #:add-map-rows
-   #:add-mapping-rows
-   #:add-map-rows!
-   #:add-mapping-rows!))
-
-(cl:in-package #:cl-data-frame)
-
+   #:length
+   #:make-df
+   #:alist-df
+   #:plist-df
+   #:df
+   #:matrix-df
+   ;; transformations for both data-vector and data-matrix
+   ;; #:add-columns
+   ;; #:add-column!
+   ;; #:add-columns!
+   ;; #:map-rows
+   ;; #:select-rows
+   ;; #:mapping-rows
+   ;; #:selecting-rows
+   ;; #:add-map-rows
+   ;; #:add-mapping-rows
+   ;; #:add-map-rows!
+   ;; #:add-mapping-rows!
+))
 
+(cl:in-package #:cl-data-frame)
 
 ;;; Ordered keys provide a mapping from column keys (symbols) to nonnegative
 ;;; integers.  They are used internally and the corresponding interface is
@@ -126,24 +135,28 @@ TABLE maps keys to indexes, starting from zero."
                      (slot-value condition 'key)
                      (slot-value condition 'keys)))))
 
-(defun key-list (ordered-keys)
-  "List of all keys."
-  (mapcar #'car
-          (sort (hash-table-alist (ordered-keys-table ordered-keys))
-                #'<=
-                :key #'cdr)))
+(defun keys-count (ordered-keys)
+  "Number of keys."
+  (hash-table-count (ordered-keys-table ordered-keys)))
+
+(defun keys-vector (ordered-keys)
+  "Vector of all keys."
+  (map 'vector #'car
+       (sort (hash-table-alist (ordered-keys-table ordered-keys))
+             #'<=
+             :key #'cdr)))
 
 (defun key-index (ordered-keys key)
   "Return the index for KEY."
   (let+ (((&values index present?)
           (gethash key (ordered-keys-table ordered-keys))))
     (unless present?
-      (error 'key-not-found :key key :keys (key-list ordered-keys)))
+      (error 'key-not-found :key key :keys (keys-vector ordered-keys)))
     index))
 
 (defmethod print-object ((ordered-keys ordered-keys) stream)
   (print-unreadable-object (ordered-keys stream :type t)
-    (format stream "~{~a~^, ~}" (key-list ordered-keys))))
+    (format stream "~{~a~^, ~}" (keys-vector ordered-keys))))
 
 (defun add-key! (ordered-keys key)
   "Modify ORDERED-KEYS by adding KEY."
@@ -179,243 +192,293 @@ TABLE maps keys to indexes, starting from zero."
 (defmethod slice ((ordered-keys ordered-keys) &rest slices)
   (let+ (((slice) slices))
     (ordered-keys
-     (slice (key-list ordered-keys)
+     (slice (keys-vector ordered-keys)
             (canonical-representation ordered-keys slice)))))
 
 
+;;; generic implementation -- the class is not exported, only the functionality
 
-(defclass data-frame ()
+(defclass data ()
   ((ordered-keys
     :initarg :ordered-keys
     :type ordered-keys)
    (columns
     :initarg :columns
     :type vector
-    :reader columns-vector)))
+    :reader columns))
+  (:documentation "This class is used for implementing both data-vector and data-matrix, and represents and ordered collection of key-column pairs.  Columns are not assumed to have any specific attributes.  This class is not exported."))
 
-(defun make-data-frame (ordered-keys columns)
-  "Create a data frame from ORDERED-KEYS and COLUMNS (can be any kind of
-sequence).  FOR INTERNAL USE.  Always creates a copy of COLUMNS in order to
-ensure that it is an adjustable array with a fill pointer."
-  (let ((n-columns (length columns)))
-    (make-instance 'data-frame
+(defun make-data (class keys columns)
+  "Create a DATA object from KEYS and COLUMNS.  FOR INTERNAL USE.  Always creates a copy of COLUMNS in order to ensure that it is an adjustable array with a fill pointer.  KEYS are converted to ORDERED-KEYS if necessary."
+  (let ((n-columns (length columns))
+        (ordered-keys (atypecase keys
+                        (ordered-keys it)
+                        (t (ordered-keys it)))))
+    (assert (= n-columns (keys-count ordered-keys)))
+    (make-instance class
                    :ordered-keys ordered-keys
                    :columns (make-array n-columns
                                         :adjustable t
                                         :fill-pointer n-columns
                                         :initial-contents columns))))
 
-(defun data-frame-length (data-frame)
-  "Length of DATA-FRAME (number of rows)."
-  (column-length (aref (columns-vector data-frame) 0)))
+(defun alist-data (class alist)
+  "Create an object of CLASS (subclass of DATA) from ALIST which contains key-column pairs."
+  (assert alist () "Can't create an empty data frame.")
+  (make-data class (mapcar #'car alist) (mapcar #'cdr alist)))
 
-(defun column (data-frame key)
-  "Return the column of DATA-FRAME corresponding to KEYS."
-  (let+ (((&slots-r/o ordered-keys columns) data-frame))
-    (aref columns (key-index ordered-keys key))))
+(defun plist-data (class plist)
+  "Create an object of CLASS (subclass of DATA) from PLIST which contains keys and columns, interleaved."
+  (alist-data class (plist-alist plist)))
 
-(defun data-frame-keys (data-frame)
+(defun guess-alist? (plist-or-alist)
+  "Test if the argument is an ALIST by checking its first element.  Used for deciding which creation function to call."
+  (consp (car plist-or-alist)))
+
+(defun keys (data)
   "List of keys."
-  (key-list (slot-value data-frame 'ordered-keys)))
+  (check-type data data)
+  (copy-seq (keys-vector (slot-value data 'ordered-keys))))
 
-(defun data-frame-alist (data-frame)
+(defun as-alist (data)
   "Key-column pairs as an alist."
-  (map 'list #'cons (data-frame-keys data-frame) (columns-vector data-frame)))
+  (check-type data data)
+  (map 'list #'cons (keys data) (columns data)))
 
-(defun data-frame-plist (data-frame)
+(defun as-plist (data)
   "Key-column pairs as a plist."
-  (alist-plist (data-frame-alist data-frame)))
+  (check-type data data)
+  (alist-plist (as-alist data)))
 
-(defun alist-data-frame (key-and-column-alist)
-  "Create a data from an alist of KEYs and COLUMNs.  Columns are checked for matching length."
-  (assert key-and-column-alist () "Can't create an empty data frame.")
-  (let* ((columns (mapcar #'cdr key-and-column-alist))
-         (length (column-length (car columns))))
+(defun copy (data &key (key #'identity))
+  "Copy data frame or vector.  Keys are copied (and thus can be modified), columns or elements are copyied using KEY, making the default give a shallow copy."
+  (let+ (((&slots-r/o ordered-keys columns) data))
+    (make-data (class-of data)
+               (copy-ordered-keys ordered-keys)
+               (map 'vector key columns))))
+
+(defgeneric add-column! (data key column)
+  (:documentation  "Modify DATA (a data-frame or data-vector) by adding COLUMN with KEY.  Return DATA.")
+  ;; NOTE This is a generic function because data-frames check column length.
+  (:method ((data data) (key symbol) column)
+    (let+ (((&slots ordered-keys columns) data))
+      (add-key! ordered-keys key)
+      (vector-push-extend column columns))
+    data))
+
+(defun add-columns! (data &rest key-and-column-plist)
+  "Modify DATA (a data-frame or data-vector) by adding columns with keys (specified as a plist.  Return DATA."
+  (mapc (lambda+ ((key . column))
+          (add-column! data key column))
+        (plist-alist key-and-column-plist))
+  data)
+
+(defun add-columns (data &rest key-and-column-plist)
+  "Return a new data-frame or data-vector with keys and columns added.  Does not modify DATA."
+  (aprog1 (copy data)
+    (apply #'add-columns! it key-and-column-plist)))
+
+(defmacro define-data-subclass (class abbreviation)
+  (check-type class symbol)
+  (check-type abbreviation symbol)
+  (let+ (((&flet fname (prefix)
+            (symbolicate prefix '#:- abbreviation)))
+         (alist-fn (fname '#:alist))
+         (plist-fn (fname '#:plist)))
+    `(progn
+       (defclass ,class (data)
+         ())
+       (defun ,(fname '#:make) (keys columns)
+         (make-data 'data-vector keys columns))
+       (defun ,alist-fn (alist)
+         (alist-data ',class alist))
+       (defun ,plist-fn (plist)
+         (plist-data ',class plist))
+       (defun ,abbreviation (&rest plist-or-alist)
+         (if (guess-alist? plist-or-alist)
+             (,alist-fn plist-or-alist)
+             (,plist-fn plist-or-alist))))))
+
+(define-data-subclass data-vector dv)
+
+(defmethod print-object ((data-vector data-vector) stream)
+  (print-unreadable-object (data-vector stream :type t)
+    (let ((alist (as-alist data-vector)))
+      (format stream "~d" (length alist))
+      (loop for (key . column) in alist
+            do (format stream "~&  ~A  ~A"
+                       key column)))))
+
+(define-data-subclass data-frame df)
+
+(defmethod initialize-instance :after ((data-frame data-frame) &rest initargs)
+  (declare (ignore initargs))
+  (let+ (((first . rest) (coerce (columns data-frame) 'list))
+         (length (column-length first)))
     (assert (every (lambda (column)
                      (= length (column-length column)))
-                   (cdr columns)))
-    (make-data-frame (ordered-keys (mapcar #'car key-and-column-alist))
-                     columns)))
+                   rest)
+            () "Columns don't have the same length.")))
 
-(defun plist-data-frame (key-and-column-plist)
-  "Create a data from a plist of KEYs and COLUMNs.  Columns are checked for matching length."
-  (assert key-and-column-plist () "Can't create an empty data frame.")
-  (alist-data-frame (plist-alist key-and-column-plist)))
-
-(defun data-frame (&rest plist-or-alist)
-  "Create a data from a plist or alist of KEYs and COLUMNs.  Columns are checked for matching length.
-
-If the first argument is a CONS, the rest are assumed to be conses (hence an alist), otherwise the arguments are considered a PLIST."
-  (if (consp (car plist-or-alist))
-      (alist-data-frame plist-or-alist)
-      (plist-data-frame plist-or-alist)))
+(defun length (data-frame)
+  "Length of DATA-FRAME (number of rows)."
+  (check-type data-frame data-frame)
+  (column-length (aref (columns data-frame) 0)))
 
 (defmethod print-object ((data-frame data-frame) stream)
   (print-unreadable-object (data-frame stream :type t)
-    (let ((alist (data-frame-alist data-frame)))
-      (format stream "~d x ~d" (length alist) (data-frame-length data-frame))
+    (let ((alist (as-alist data-frame)))
+      (format stream "~d x ~d" (length alist) (length data-frame))
       (loop for (key . column) in alist
             do (format stream "~&  ~A  ~A"
                        key (column-summary column))))))
 
-(defun copy-data-frame (data-frame)
-  "Create a copy of a data frame."
-  (let+ (((&slots-r/o ordered-keys columns) data-frame))
-    (make-data-frame (copy-ordered-keys ordered-keys)
-                     columns))) ; NOTE: make-data-frame copies columns
+(defun matrix-df (keys matrix)
+  "Convert a matrix to a data-frame with the given keys."
+  (let+ ((columns (ao:split (ao:transpose matrix) 1)))
+    (assert (length= columns keys))
+    (alist-df (map 'list #'cons keys columns))))
 
-(defun add-column! (data-frame key column)
-  "Modify DATA-FRAME by adding COLUMN with KEY.  Return DATA-FRAME."
-  (let+ (((&slots ordered-keys columns) data-frame))
-    (assert (= (column-length column) (data-frame-length data-frame)))
-    (add-key! ordered-keys key)
-    (vector-push-extend column columns))
-  data-frame)
+(defmethod add-column! :before ((data data-frame) key column)
+  (assert (= (column-length column) (length data))))
 
-(defun add-columns! (data-frame &rest key-and-column-plist)
-  "Modify DATA-FRAME by adding columns with keys (specified as a plist.
-Return DATA-FRAME."
-  (mapc (lambda+ ((key . column))
-          (add-column! data-frame key column))
-        (plist-alist key-and-column-plist))
-  data-frame)
+;; 
 
-(defun add-columns (data-frame &rest key-and-column-plist)
-  "Return a new data frame with keys and columns added.  Does not modify
-DATA-FRAME."
-  (aprog1 (copy-data-frame data-frame)
-    (apply #'add-columns! it key-and-column-plist)))
+;; ;;; implementation of SLICE for DATA-FRAME
 
-
+;; (defmethod slice ((data-frame data-frame) &rest slices)
+;;   (let+ (((row-slice &optional (column-slice t)) slices)
+;;          ((&slots-r/o ordered-keys columns) data-frame)
+;;          (column-slice (canonical-representation ordered-keys column-slice))
+;;          (columns (slice columns column-slice))
+;;          ((&flet slice-column (column)
+;;             (slice column row-slice))))
+;;     (if (singleton-representation? column-slice)
+;;         (slice-column columns)
+;;         (make-data-frame (slice ordered-keys column-slice)
+;;                          (map 'vector #'slice-column columns)))))
 
-;;; implementation of SLICE for DATA-FRAME
+;; ;;; TODO: (setf slice)
 
-(defmethod slice ((data-frame data-frame) &rest slices)
-  (let+ (((row-slice &optional (column-slice t)) slices)
-         ((&slots-r/o ordered-keys columns) data-frame)
-         (column-slice (canonical-representation ordered-keys column-slice))
-         (columns (slice columns column-slice))
-         ((&flet slice-column (column)
-            (slice column row-slice))))
-    (if (singleton-representation? column-slice)
-        (slice-column columns)
-        (make-data-frame (slice ordered-keys column-slice)
-                         (map 'vector #'slice-column columns)))))
+;; 
 
-;;; TODO: (setf slice)
+;; ;;; mapping rows and adding columns
 
-
+;; (defun map-rows (data-frame keys function &key (element-type t))
+;;   "Map rows using FUNCTION, on the columns corresponding to KEYS.  Return the
+;; result with the given ELEMENT-TYPE."
+;;   (let ((columns (map 'list (curry #'column data-frame) keys))
+;;         (length (data-frame-length data-frame)))
+;;     (aprog1 (make-array length :element-type element-type)
+;;       (dotimes (index length)
+;;         (setf (aref it index)
+;;               (apply function
+;;                      (mapcar (lambda (column)
+;;                                (ref column index))
+;;                              columns)))))))
 
-;;; mapping rows and adding columns
+;; (defun select-rows (data-frame keys predicate)
+;;   "Return a bit-vector containing the result of calling PREDICATE on rows of
+;; the columns corresponding to KEYS (0 for NIL, 1 otherwise)."
+;;   (map-rows data-frame keys (compose (lambda (flag)
+;;                                        (if flag 1 0))
+;;                                      predicate)
+;;             :element-type 'bit-vector))
 
-(defun map-rows (data-frame keys function &key (element-type t))
-  "Map rows using FUNCTION, on the columns corresponding to KEYS.  Return the
-result with the given ELEMENT-TYPE."
-  (let ((columns (map 'list (curry #'column data-frame) keys))
-        (length (data-frame-length data-frame)))
-    (aprog1 (make-array length :element-type element-type)
-      (dotimes (index length)
-        (setf (aref it index)
-              (apply function
-                     (mapcar (lambda (column)
-                               (ref column index))
-                             columns)))))))
+;; 
 
-(defun select-rows (data-frame keys predicate)
-  "Return a bit-vector containing the result of calling PREDICATE on rows of
-the columns corresponding to KEYS (0 for NIL, 1 otherwise)."
-  (map-rows data-frame keys (compose (lambda (flag)
-                                       (if flag 1 0))
-                                     predicate)
-            :element-type 'bit-vector))
+;; ;;; macros
 
-
+;; (defun process-bindings (bindings)
+;;   "Return forms for variables and keys as two values, for use in macros.
 
-;;; macros
+;; BINDINGS is a list of (VARIABLE &optional KEY) forms, where VARIABLE is a
+;; symbol and KEY is evaluated.  When KEY is not given, it is VARIABLE converted
+;; to a keyword.
 
-(defun process-bindings (bindings)
-  "Return forms for variables and keys as two values, for use in macros.
+;; NOT EXPORTED."
+;;   (let ((alist (mapcar (lambda+ ((variable
+;;                                   &optional (key (make-keyword variable))))
+;;                          (check-type variable symbol)
+;;                          (cons variable key))
+;;                        bindings)))
+;;     (values (mapcar #'car alist)
+;;             `(list ,@(mapcar #'cdr alist)))))
 
-BINDINGS is a list of (VARIABLE &optional KEY) forms, where VARIABLE is a
-symbol and KEY is evaluated.  When KEY is not given, it is VARIABLE converted
-to a keyword.
+;; (defun keys-and-lambda-from-bindings (bindings body)
+;;   "Process bindings and return a form that can be spliced into the place of
+;; KEYS and FUNCTION (using BODY) in functions that map rows.  NOT EXPORTED."
+;;   (unless body
+;;     (warn "Empty function body."))
+;;   (let+ (((&values variables keys) (process-bindings bindings)))
+;;     `(,keys (lambda ,variables ,@body))))
 
-NOT EXPORTED."
-  (let ((alist (mapcar (lambda+ ((variable
-                                  &optional (key (make-keyword variable))))
-                         (check-type variable symbol)
-                         (cons variable key))
-                       bindings)))
-    (values (mapcar #'car alist)
-            `(list ,@(mapcar #'cdr alist)))))
+;; (defmacro mapping-rows ((data-frame bindings &key (element-type t))
+;;                          &body body)
+;;   "Map rows of DATA-FRAME and return the resulting column (with the given
+;; ELEMENT-TYPE).  See MAP-ROWS.
 
-(defun keys-and-lambda-from-bindings (bindings body)
-  "Process bindings and return a form that can be spliced into the place of
-KEYS and FUNCTION (using BODY) in functions that map rows.  NOT EXPORTED."
-  (unless body
-    (warn "Empty function body."))
-  (let+ (((&values variables keys) (process-bindings bindings)))
-    `(,keys (lambda ,variables ,@body))))
+;; BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to
+;; the VARIABLEs for the columns designated by KEYs."
+;;   `(map-rows ,data-frame
+;;              ,@(keys-and-lambda-from-bindings bindings body)
+;;              :element-type ,element-type))
 
-(defmacro mapping-rows ((data-frame bindings &key (element-type t))
-                         &body body)
-  "Map rows of DATA-FRAME and return the resulting column (with the given
-ELEMENT-TYPE).  See MAP-ROWS.
+;; (defmacro selecting-rows ((data-frame bindings) &body body)
+;;   "Map rows using predicate and return the resulting bit vector (see
+;; SELECT-ROWS).
 
-BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to
-the VARIABLEs for the columns designated by KEYs."
-  `(map-rows ,data-frame
-             ,@(keys-and-lambda-from-bindings bindings body)
-             :element-type ,element-type))
+;; BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to
+;; the VARIABLEs for the columns designated by KEYs."
+;;   `(select-rows ,data-frame
+;;                 ,@(keys-and-lambda-from-bindings bindings body)))
 
-(defmacro selecting-rows ((data-frame bindings) &body body)
-  "Map rows using predicate and return the resulting bit vector (see
-SELECT-ROWS).
+;; (defmacro define-map-add-function-and-macro (blurb (function function-used)
+;;                                              macro)
+;;   "Macro for defining functions that map and add columns.  BLURB is used in
+;; the docstring, FUNCTION is defined using FUNCTION-USED, and MACRO is the
+;; corresponding macro."
+;;   `(progn
+;;      (defun ,function (data-frame keys function result-key
+;;                        &key (element-type t))
+;;        ,(format nil
+;; "Map columns of DATA-FRAME and add the resulting column (with the given
+;; ELEMENT-TYPE), designated by RESULT-KEY.  ~A
 
-BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to
-the VARIABLEs for the columns designated by KEYs."
-  `(select-rows ,data-frame
-                ,@(keys-and-lambda-from-bindings bindings body)))
+;; KEYS selects columns, the rows of which are passed on to FUNCTION."
+;;                 blurb)
+;;        (,function-used data-frame result-key
+;;                        (map-rows data-frame keys function
+;;                                  :element-type element-type)))
+;;      (defmacro ,macro ((data-frame key bindings &key (element-type t))
+;;                        &body body)
+;;        ,(format nil
+;; "Map rows of DATA-FRAME and add the resulting column (with the given
+;; ELEMENT-TYPE), designated by KEY.  ~A
 
-(defmacro define-map-add-function-and-macro (blurb (function function-used)
-                                             macro)
-  "Macro for defining functions that map and add columns.  BLURB is used in
-the docstring, FUNCTION is defined using FUNCTION-USED, and MACRO is the
-corresponding macro."
-  `(progn
-     (defun ,function (data-frame keys function result-key
-                       &key (element-type t))
-       ,(format nil
-"Map columns of DATA-FRAME and add the resulting column (with the given
-ELEMENT-TYPE), designated by RESULT-KEY.  ~A
+;; BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to
+;; the VARIABLEs for the columns designated by KEYs."
+;;                 blurb)
+;;        `(,',function ,data-frame
+;;                      ,@(keys-and-lambda-from-bindings bindings body)
+;;                      ,key
+;;                      :element-type ,element-type))))
 
-KEYS selects columns, the rows of which are passed on to FUNCTION."
-                blurb)
-       (,function-used data-frame result-key
-                       (map-rows data-frame keys function
-                                 :element-type element-type)))
-     (defmacro ,macro ((data-frame key bindings &key (element-type t))
-                       &body body)
-       ,(format nil
-"Map rows of DATA-FRAME and add the resulting column (with the given
-ELEMENT-TYPE), designated by KEY.  ~A
+;; (define-map-add-function-and-macro
+;;     "Return a new data-frame."
+;;     (add-map-rows add-columns)
+;;     add-mapping-rows)
 
-BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to
-the VARIABLEs for the columns designated by KEYs."
-                blurb)
-       `(,',function ,data-frame
-                     ,@(keys-and-lambda-from-bindings bindings body)
-                     ,key
-                     :element-type ,element-type))))
+;; (define-map-add-function-and-macro
+;;     "Modify (and also return) DATA-FRAME."
+;;     (add-map-rows! add-column!)
+;;     add-mapping-rows!)
 
-(define-map-add-function-and-macro
-    "Return a new data-frame."
-    (add-map-rows add-columns)
-    add-mapping-rows)
+;; 
 
-(define-map-add-function-and-macro
-    "Modify (and also return) DATA-FRAME."
-    (add-map-rows! add-column!)
-    add-mapping-rows!)
+;; ;;; matrix conversions
 
-
+;; (defun data-frame-matrix (data-frame)
+;;   (ao:combine (data-fr))
+;;   (let ((columns )))
+;;   )
