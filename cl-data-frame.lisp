@@ -364,27 +364,27 @@ TABLE maps keys to indexes, starting from zero."
 (defun df-matrix (data-frame)
   "Return contents of DATA-FRAME as a matrix."
   (ao:transpose (ao:combine (columns data-frame))))
+
+;;; implementation of SLICE for DATA-FRAME
 
-;; 
+(defmethod slice ((data-frame data-frame) &rest slices)
+  (let+ (((row-slice &optional (column-slice t)) slices)
+         ((&slots-r/o ordered-keys columns) data-frame)
+         (row-slice (canonical-representation (length data-frame) row-slice))
+         (column-slice (canonical-representation ordered-keys column-slice))
+         (columns (slice columns column-slice))
+         ((&flet slice-column (column)
+            (slice column row-slice))))
+    (if (singleton-representation? column-slice)
+        (slice-column columns)
+        (let ((keys (slice ordered-keys column-slice))
+              (columns (map 'vector #'slice-column columns)))
+          (if (singleton-representation? row-slice)
+              (make-dv keys columns)
+              (make-df keys columns))))))
 
-;; ;;; implementation of SLICE for DATA-FRAME
-
-;; (defmethod slice ((data-frame data-frame) &rest slices)
-;;   (let+ (((row-slice &optional (column-slice t)) slices)
-;;          ((&slots-r/o ordered-keys columns) data-frame)
-;;          (column-slice (canonical-representation ordered-keys column-slice))
-;;          (columns (slice columns column-slice))
-;;          ((&flet slice-column (column)
-;;             (slice column row-slice))))
-;;     (if (singleton-representation? column-slice)
-;;         (slice-column columns)
-;;         (make-data-frame (slice ordered-keys column-slice)
-;;                          (map 'vector #'slice-column columns)))))
-
-;; ;;; TODO: (setf slice)
-
-;; 
-
+;;; TODO: (setf slice)
+
 ;;; mapping rows and adding columns
 
 (defun map-rows (data-frame keys function &key (element-type t))
