@@ -76,6 +76,7 @@
    #:key-not-found
    ;; generic - both data-vector and data-frame
    #:columns
+   #:column
    #:keys
    #:copy
    #:as-alist
@@ -222,6 +223,10 @@ TABLE maps keys to indexes, starting from zero."
                                         :fill-pointer n-columns
                                         :initial-contents columns))))
 
+(defgeneric check-column-compatibility (data column)
+  (:documentation "Check if COLUMN is compatible with DATA.")
+  (:method ((data data) column)))
+
 (defun alist-data (class alist)
   "Create an object of CLASS (subclass of DATA) from ALIST which contains key-column pairs."
   (assert alist () "Can't create an empty data frame.")
@@ -252,19 +257,32 @@ TABLE maps keys to indexes, starting from zero."
 
 (defun copy (data &key (key #'identity))
   "Copy data frame or vector.  Keys are copied (and thus can be modified), columns or elements are copyied using KEY, making the default give a shallow copy."
+  (check-type data data)
   (let+ (((&slots-r/o ordered-keys columns) data))
     (make-data (class-of data)
                (copy-ordered-keys ordered-keys)
                (map 'vector key columns))))
 
-(defgeneric add-column! (data key column)
-  (:documentation  "Modify DATA (a data-frame or data-vector) by adding COLUMN with KEY.  Return DATA.")
-  ;; NOTE This is a generic function because data-frames check column length.
-  (:method ((data data) (key symbol) column)
-    (let+ (((&slots ordered-keys columns) data))
-      (add-key! ordered-keys key)
-      (vector-push-extend column columns))
-    data))
+(defun column (data key)
+  "Return column corresponding to key."
+  (check-type data data)
+  (let+ (((&slots-r/o ordered-keys columns) data))
+    (aref columns (key-index ordered-keys key))))
+
+(defun (setf column) (column data key)
+  "Set column corresponding to key."
+  (check-column-compatibility data column)
+  (let+ (((&slots-r/o ordered-keys columns) data))
+    (setf (aref columns (key-index ordered-keys key)) column)))
+
+
+(defun add-column! (data key column)
+  "Modify DATA (a data-frame or data-vector) by adding COLUMN with KEY.  Return DATA."
+  (check-column-compatibility data column)
+  (let+ (((&slots ordered-keys columns) data))
+    (add-key! ordered-keys key)
+    (vector-push-extend column columns))
+  data)
 
 (defun add-columns! (data &rest key-and-column-plist)
   "Modify DATA (a data-frame or data-vector) by adding columns with keys (specified as a plist.  Return DATA."
@@ -325,6 +343,9 @@ TABLE maps keys to indexes, starting from zero."
   (check-type data-frame data-frame)
   (column-length (aref (columns data-frame) 0)))
 
+(defmethod check-column-compatibility ((data data-frame) column)
+  (assert (= (column-length column) (length data))))
+
 (defmethod print-object ((data-frame data-frame) stream)
   (print-unreadable-object (data-frame stream :type t)
     (let ((alist (as-alist data-frame)))
@@ -339,8 +360,10 @@ TABLE maps keys to indexes, starting from zero."
     (assert (length= columns keys))
     (alist-df (map 'list #'cons keys columns))))
 
-(defmethod add-column! :before ((data data-frame) key column)
-  (assert (= (column-length column) (length data))))
+
+(defun df-matrix (data-frame)
+  "Return contents of DATA-FRAME as a matrix."
+  (ao:transpose (ao:combine (columns data-frame))))
 
 ;; 
 
@@ -362,123 +385,114 @@ TABLE maps keys to indexes, starting from zero."
 
 ;; 
 
-;; ;;; mapping rows and adding columns
+;;; mapping rows and adding columns
 
-;; (defun map-rows (data-frame keys function &key (element-type t))
-;;   "Map rows using FUNCTION, on the columns corresponding to KEYS.  Return the
-;; result with the given ELEMENT-TYPE."
-;;   (let ((columns (map 'list (curry #'column data-frame) keys))
-;;         (length (data-frame-length data-frame)))
-;;     (aprog1 (make-array length :element-type element-type)
-;;       (dotimes (index length)
-;;         (setf (aref it index)
-;;               (apply function
-;;                      (mapcar (lambda (column)
-;;                                (ref column index))
-;;                              columns)))))))
+(defun map-rows (data-frame keys function &key (element-type t))
+  "Map rows using FUNCTION, on the columns corresponding to KEYS.  Return the
+result with the given ELEMENT-TYPE."
+  (let ((columns (map 'list (curry #'column data-frame) keys))
+        (length (length data-frame)))
+    (aprog1 (make-array length :element-type element-type)
+      (dotimes (index length)
+        (setf (aref it index)
+              (apply function
+                     (mapcar (lambda (column)
+                               (ref column index))
+                             columns)))))))
 
-;; (defun select-rows (data-frame keys predicate)
-;;   "Return a bit-vector containing the result of calling PREDICATE on rows of
-;; the columns corresponding to KEYS (0 for NIL, 1 otherwise)."
-;;   (map-rows data-frame keys (compose (lambda (flag)
-;;                                        (if flag 1 0))
-;;                                      predicate)
-;;             :element-type 'bit-vector))
+(defun select-rows (data-frame keys predicate)
+  "Return a bit-vector containing the result of calling PREDICATE on rows of
+the columns corresponding to KEYS (0 for NIL, 1 otherwise)."
+  (map-rows data-frame keys (compose (lambda (flag)
+                                       (if flag 1 0))
+                                     predicate)
+            :element-type 'bit-vector))
 
-;; 
+
 
-;; ;;; macros
+;;; macros
 
-;; (defun process-bindings (bindings)
-;;   "Return forms for variables and keys as two values, for use in macros.
+(defun process-bindings (bindings)
+  "Return forms for variables and keys as two values, for use in macros.
 
-;; BINDINGS is a list of (VARIABLE &optional KEY) forms, where VARIABLE is a
-;; symbol and KEY is evaluated.  When KEY is not given, it is VARIABLE converted
-;; to a keyword.
+BINDINGS is a list of (VARIABLE &optional KEY) forms, where VARIABLE is a
+symbol and KEY is evaluated.  When KEY is not given, it is VARIABLE converted
+to a keyword.
 
-;; NOT EXPORTED."
-;;   (let ((alist (mapcar (lambda+ ((variable
-;;                                   &optional (key (make-keyword variable))))
-;;                          (check-type variable symbol)
-;;                          (cons variable key))
-;;                        bindings)))
-;;     (values (mapcar #'car alist)
-;;             `(list ,@(mapcar #'cdr alist)))))
+NOT EXPORTED."
+  (let ((alist (mapcar (lambda+ ((variable
+                                  &optional (key (make-keyword variable))))
+                         (check-type variable symbol)
+                         (cons variable key))
+                       bindings)))
+    (values (mapcar #'car alist)
+            `(list ,@(mapcar #'cdr alist)))))
 
-;; (defun keys-and-lambda-from-bindings (bindings body)
-;;   "Process bindings and return a form that can be spliced into the place of
-;; KEYS and FUNCTION (using BODY) in functions that map rows.  NOT EXPORTED."
-;;   (unless body
-;;     (warn "Empty function body."))
-;;   (let+ (((&values variables keys) (process-bindings bindings)))
-;;     `(,keys (lambda ,variables ,@body))))
+(defun keys-and-lambda-from-bindings (bindings body)
+  "Process bindings and return a form that can be spliced into the place of
+KEYS and FUNCTION (using BODY) in functions that map rows.  NOT EXPORTED."
+  (unless body
+    (warn "Empty function body."))
+  (let+ (((&values variables keys) (process-bindings bindings)))
+    `(,keys (lambda ,variables ,@body))))
 
-;; (defmacro mapping-rows ((data-frame bindings &key (element-type t))
-;;                          &body body)
-;;   "Map rows of DATA-FRAME and return the resulting column (with the given
-;; ELEMENT-TYPE).  See MAP-ROWS.
+(defmacro mapping-rows ((data-frame bindings &key (element-type t))
+                         &body body)
+  "Map rows of DATA-FRAME and return the resulting column (with the given
+ELEMENT-TYPE).  See MAP-ROWS.
 
-;; BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to
-;; the VARIABLEs for the columns designated by KEYs."
-;;   `(map-rows ,data-frame
-;;              ,@(keys-and-lambda-from-bindings bindings body)
-;;              :element-type ,element-type))
+BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to
+the VARIABLEs for the columns designated by KEYs."
+  `(map-rows ,data-frame
+             ,@(keys-and-lambda-from-bindings bindings body)
+             :element-type ,element-type))
 
-;; (defmacro selecting-rows ((data-frame bindings) &body body)
-;;   "Map rows using predicate and return the resulting bit vector (see
-;; SELECT-ROWS).
+(defmacro selecting-rows ((data-frame bindings) &body body)
+  "Map rows using predicate and return the resulting bit vector (see
+SELECT-ROWS).
 
-;; BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to
-;; the VARIABLEs for the columns designated by KEYs."
-;;   `(select-rows ,data-frame
-;;                 ,@(keys-and-lambda-from-bindings bindings body)))
+BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to
+the VARIABLEs for the columns designated by KEYs."
+  `(select-rows ,data-frame
+                ,@(keys-and-lambda-from-bindings bindings body)))
 
-;; (defmacro define-map-add-function-and-macro (blurb (function function-used)
-;;                                              macro)
-;;   "Macro for defining functions that map and add columns.  BLURB is used in
-;; the docstring, FUNCTION is defined using FUNCTION-USED, and MACRO is the
-;; corresponding macro."
-;;   `(progn
-;;      (defun ,function (data-frame keys function result-key
-;;                        &key (element-type t))
-;;        ,(format nil
-;; "Map columns of DATA-FRAME and add the resulting column (with the given
-;; ELEMENT-TYPE), designated by RESULT-KEY.  ~A
+(defmacro define-map-add-function-and-macro (blurb (function function-used)
+                                             macro)
+  "Macro for defining functions that map and add columns.  BLURB is used in
+the docstring, FUNCTION is defined using FUNCTION-USED, and MACRO is the
+corresponding macro."
+  `(progn
+     (defun ,function (data-frame keys function result-key
+                       &key (element-type t))
+       ,(format nil
+"Map columns of DATA-FRAME and add the resulting column (with the given
+ELEMENT-TYPE), designated by RESULT-KEY.  ~A
 
-;; KEYS selects columns, the rows of which are passed on to FUNCTION."
-;;                 blurb)
-;;        (,function-used data-frame result-key
-;;                        (map-rows data-frame keys function
-;;                                  :element-type element-type)))
-;;      (defmacro ,macro ((data-frame key bindings &key (element-type t))
-;;                        &body body)
-;;        ,(format nil
-;; "Map rows of DATA-FRAME and add the resulting column (with the given
-;; ELEMENT-TYPE), designated by KEY.  ~A
+KEYS selects columns, the rows of which are passed on to FUNCTION."
+                blurb)
+       (,function-used data-frame result-key
+                       (map-rows data-frame keys function
+                                 :element-type element-type)))
+     (defmacro ,macro ((data-frame key bindings &key (element-type t))
+                       &body body)
+       ,(format nil
+"Map rows of DATA-FRAME and add the resulting column (with the given
+ELEMENT-TYPE), designated by KEY.  ~A
 
-;; BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to
-;; the VARIABLEs for the columns designated by KEYs."
-;;                 blurb)
-;;        `(,',function ,data-frame
-;;                      ,@(keys-and-lambda-from-bindings bindings body)
-;;                      ,key
-;;                      :element-type ,element-type))))
+BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to
+the VARIABLEs for the columns designated by KEYs."
+                blurb)
+       `(,',function ,data-frame
+                     ,@(keys-and-lambda-from-bindings bindings body)
+                     ,key
+                     :element-type ,element-type))))
 
-;; (define-map-add-function-and-macro
-;;     "Return a new data-frame."
-;;     (add-map-rows add-columns)
-;;     add-mapping-rows)
+(define-map-add-function-and-macro
+    "Return a new data-frame."
+    (add-map-rows add-columns)
+    add-mapping-rows)
 
-;; (define-map-add-function-and-macro
-;;     "Modify (and also return) DATA-FRAME."
-;;     (add-map-rows! add-column!)
-;;     add-mapping-rows!)
-
-;; 
-
-;; ;;; matrix conversions
-
-;; (defun data-frame-matrix (data-frame)
-;;   (ao:combine (data-fr))
-;;   (let ((columns )))
-;;   )
+(define-map-add-function-and-macro
+    "Modify (and also return) DATA-FRAME."
+    (add-map-rows! add-column!)
+    add-mapping-rows!)
