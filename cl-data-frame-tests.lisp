@@ -29,34 +29,25 @@
 
 (deftest data-frame-creation (data-frame-basics)
   (let* ((plist `(:vector ,v :symbols ,s))
-         (df (apply #'data-frame plist))
-         (df-plist (plist-data-frame plist))
-         (df-alist (alist-data-frame (plist-alist plist))))
-    (assert-equalp '(:vector :symbols)
-        (data-frame-keys df))
-    (assert-equalp (vector v s)
-        (columns-vector df))
-    (assert-equalp `(:vector ,v :symbols ,s)
-        (data-frame-plist df))
-    (assert-equalp `((:vector . ,v) (:symbols . ,s))
-        (data-frame-alist df))
-    (assert-equalp (data-frame-alist df)
-        (data-frame-alist df-plist))
-    (assert-equalp (data-frame-alist df)
-        (data-frame-alist df-alist))))
+         (df (apply #'df plist))
+         (df-plist (plist-df plist))
+         (df-alist (alist-df (plist-alist plist))))
+    (assert-equalp #(:vector :symbols) (keys df))
+    (assert-equalp (vector v s) (columns df))
+    (assert-equalp `(:vector ,v :symbols ,s) (as-plist df))
+    (assert-equalp `((:vector . ,v) (:symbols . ,s)) (as-alist df))
+    (assert-equalp (as-alist df) (as-alist df-plist))
+    (assert-equalp (as-alist df) (as-alist df-alist))))
 
 (deftest data-frame-slice (data-frame-basics)
-  (let ((df (data-frame :vector v :symbols s)))
-    (assert-equalp `(:vector ,v)
-        (data-frame-plist (slice df t #(:vector))))
-    (assert-equalp `(:vector ,(slice v b))
-        (data-frame-plist (slice df b #(0))))
-    (assert-equalp (slice v b)
-        (slice df b :vector))))
+  (let ((df (df :vector v :symbols s)))
+    (assert-equalp `(:vector ,v) (as-plist (slice df t #(:vector))))
+    (assert-equalp `(:vector ,(slice v b)) (as-plist (slice df b #(0))))
+    (assert-equalp (slice v b) (slice df b :vector))))
 
 (deftest data-frame-map (data-frame-basics)
-  (let+ ((df (data-frame :a #(2 3 5)
-                         :b #(7 11 13)))
+  (let+ ((df (df :a #(2 3 5)
+                 :b #(7 11 13)))
          (product #(14 33 65))
          ((&flet predicate (a b) (<= 30 (* a b)))))
     (assert-equalp product
@@ -73,7 +64,7 @@
           (predicate a b)))))
 
 (deftest print-object (data-frame-basics)
-  (let ((df (data-frame :a v :b b :c s)))
+  (let ((df (df :a v :b b :c s)))
     (assert-true (with-output-to-string (stream)
                    (print-object df stream)))))
 
@@ -103,15 +94,15 @@ This is a pretty comprehensive test of the add-column family of functions,
 destructive or non-destructive."
   (with-unique-names (df df2 plist12)
     (once-only (plist1 plist2)
-      `(let* ((,df (apply #'data-frame ,plist1))
+      `(let* ((,df (plist-df ,plist1))
               (,df2 (apply ,add-function ,df ,plist2))
               (,plist12 (append ,plist1 ,plist2)))
          (assert-equal (if ,append?
                            ,plist12
                            ,plist1)
-             (data-frame-plist ,df))
+             (as-plist ,df))
          (assert-equal ,plist12
-             (data-frame-plist ,df2))))))
+             (as-plist ,df2))))))
 
 (deftest add-column (data-frame-add)
     (test-add #'add-columns plist1 plist2 nil)
@@ -122,35 +113,28 @@ destructive or non-destructive."
   (let* ((plist3 '(:c #(4 10 18)))
          (plist123 (append plist12 plist3)))
     ;; non-destructive
-    (let* ((df (apply #'data-frame plist12))
+    (let* ((df (plist-df plist12))
            (df2 (add-map-rows df '(:a :b) #'* :c))
            (df3 (add-mapping-rows (df :c
                                    ((a :a)
                                     (b :b)))
                   (* a b))))
-      (assert-equalp plist12
-          (data-frame-plist df))
-      (assert-equalp plist123
-          (data-frame-plist df2))
-      (assert-equalp plist123
-          (data-frame-plist df3)))
+      (assert-equalp plist12 (as-plist df))
+      (assert-equalp plist123 (as-plist df2))
+      (assert-equalp plist123 (as-plist df3)))
     ;; destructive, function
-    (let* ((df (apply #'data-frame plist12))
+    (let* ((df (plist-df plist12))
            (df2 (add-map-rows! df '(:a :b) #'* :c)))
-      (assert-equalp plist123
-          (data-frame-plist df))
-      (assert-equalp plist123
-          (data-frame-plist df2)))
+      (assert-equalp plist123 (as-plist df))
+      (assert-equalp plist123 (as-plist df2)))
     ;; destructive, macro
-    (let* ((df (apply #'data-frame plist12))
+    (let* ((df (plist-df plist12))
            (df2 (add-mapping-rows! (df :c
                                     ((a :a)
                                      (b :b)))
                   (* a b))))
-      (assert-equalp plist123
-          (data-frame-plist df))
-      (assert-equalp plist123
-          (data-frame-plist df2)))))
+      (assert-equalp plist123 (as-plist df))
+      (assert-equalp plist123 (as-plist df2)))))
 
 (deftest empty-body-warnings (data-frame-add)
   (assert-condition warning
