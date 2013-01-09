@@ -89,7 +89,7 @@
    #:dv
    ;; data-frame
    #:data-frame
-   #:length
+   #:nrow
    #:make-df
    #:alist-df
    #:plist-df
@@ -338,18 +338,18 @@ TABLE maps keys to indexes, starting from zero."
                    rest)
             () "Columns don't have the same length.")))
 
-(defun length (data-frame)
-  "Length of DATA-FRAME (number of rows)."
+(defun nrow (data-frame)
+  "Number of rows in DATA-FRAME."
   (check-type data-frame data-frame)
   (column-length (aref (columns data-frame) 0)))
 
 (defmethod check-column-compatibility ((data data-frame) column)
-  (assert (= (column-length column) (length data))))
+  (assert (= (column-length column) (nrow data))))
 
 (defmethod print-object ((data-frame data-frame) stream)
   (print-unreadable-object (data-frame stream :type t)
     (let ((alist (as-alist data-frame)))
-      (format stream "~d x ~d" (length alist) (length data-frame))
+      (format stream "~d x ~d" (length alist) (nrow data-frame))
       (loop for (key . column) in alist
             do (format stream "~&  ~A  ~A"
                        key (column-summary column))))))
@@ -370,7 +370,7 @@ TABLE maps keys to indexes, starting from zero."
 (defmethod slice ((data-frame data-frame) &rest slices)
   (let+ (((row-slice &optional (column-slice t)) slices)
          ((&slots-r/o ordered-keys columns) data-frame)
-         (row-slice (canonical-representation (length data-frame) row-slice))
+         (row-slice (canonical-representation (nrow data-frame) row-slice))
          (column-slice (canonical-representation ordered-keys column-slice))
          (columns (slice columns column-slice))
          ((&flet slice-column (column)
@@ -391,9 +391,9 @@ TABLE maps keys to indexes, starting from zero."
   "Map rows using FUNCTION, on the columns corresponding to KEYS.  Return the
 result with the given ELEMENT-TYPE."
   (let ((columns (map 'list (curry #'column data-frame) keys))
-        (length (length data-frame)))
-    (aprog1 (make-array length :element-type element-type)
-      (dotimes (index length)
+        (nrow (nrow data-frame)))
+    (aprog1 (make-array nrow :element-type element-type)
+      (dotimes (index nrow)
         (setf (aref it index)
               (apply function
                      (mapcar (lambda (column)
