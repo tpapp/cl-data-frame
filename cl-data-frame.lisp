@@ -120,11 +120,7 @@
    #:map-rows
    #:select-rows
    #:mapping-rows
-   #:selecting-rows
-   #:add-map-rows
-   #:add-mapping-rows
-   #:add-map-rows!
-   #:add-mapping-rows!))
+   #:selecting-rows))
 
 (cl:in-package #:cl-data-frame)
 
@@ -508,44 +504,3 @@ BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to
 the VARIABLEs for the columns designated by KEYs."
   `(select-rows ,data-frame
                 ,@(keys-and-lambda-from-bindings bindings body)))
-
-(defmacro define-map-add-function-and-macro (blurb (function function-used)
-                                             macro)
-  "Macro for defining functions that map and add columns.  BLURB is used in
-the docstring, FUNCTION is defined using FUNCTION-USED, and MACRO is the
-corresponding macro."
-  `(progn
-     (defun ,function (data-frame keys function result-key
-                       &key (element-type t))
-       ,(format nil
-"Map columns of DATA-FRAME and add the resulting column (with the given
-ELEMENT-TYPE), designated by RESULT-KEY.  ~A
-
-KEYS selects columns, the rows of which are passed on to FUNCTION."
-                blurb)
-       (,function-used data-frame result-key
-                       (map-rows data-frame keys function
-                                 :element-type element-type)))
-     (defmacro ,macro ((data-frame key bindings &key (element-type t))
-                       &body body)
-       ,(format nil
-"Map rows of DATA-FRAME and add the resulting column (with the given
-ELEMENT-TYPE), designated by KEY.  ~A
-
-BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to
-the VARIABLEs for the columns designated by KEYs."
-                blurb)
-       `(,',function ,data-frame
-                     ,@(keys-and-lambda-from-bindings bindings body)
-                     ,key
-                     :element-type ,element-type))))
-
-(define-map-add-function-and-macro
-    "Return a new data-frame."
-    (add-map-rows add-columns)
-    add-mapping-rows)
-
-(define-map-add-function-and-macro
-    "Modify (and also return) DATA-FRAME."
-    (add-map-rows! add-column!)
-    add-mapping-rows!)
