@@ -62,6 +62,7 @@
                  :b #(7 11 13)))
          (product #(14 33 65))
          ((&flet predicate (a b) (<= 30 (* a b))))
+         ((&flet predicate-bit (a b) (if (predicate a b) 1 0)))
          (mask #*011))
     (assert-equalp product
         (map-rows df '(:a :b) #'*))
@@ -69,6 +70,16 @@
         (mapping-rows (df ((a :a)
                            (b :b)))
           (* a b)))
+    (assert-equalp `(:p ,product :m ,mask)
+        (as-plist (map-df df '(:a :b)
+                          (lambda (a b)
+                            (vector (* a b) (predicate-bit a b)))
+                          '((:p fixnum) (:m bit)))))
+    (assert-equalp `(:p ,product :m ,mask)
+        (as-plist (mapping-df (df ((a :a)
+                                   (b :b))
+                                  '((:p fixnum) (:m bit)))
+                    (vector (* a b) (predicate-bit a b)))))
     (assert-equalp mask
         (select-rows df '(:a :b) #'predicate))
     (assert-equalp mask
