@@ -473,7 +473,7 @@ TABLE maps keys to indexes, starting from zero."
         (assert (length= result-row result-columns))
         (map nil (lambda (result-column result-element)
                    (setf (aref result-column index) result-element))
-             result-row result-columns)))
+             result-columns result-row)))
     (make-df (mapcar #'car result-keys-and-element-types) result-columns)))
 
 (defun select-rows (data-frame keys predicate)
