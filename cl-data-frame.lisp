@@ -449,6 +449,32 @@ result with the given ELEMENT-TYPE."
                                (ref column index))
                              columns)))))))
 
+(defun map-df (data-frame keys function result-keys)
+  "Map DATA-FRAME to another one by rows.  Function is called on the columns corresponding to KEYS, and should return a sequence with the same length as RESULT-KEYS, which give the keys of the resulting data frame.  RESULT-KETS should be either symbols, or of the format (symbol &optional (element-type t))."
+  (let* ((columns (map 'list (curry #'column data-frame) keys))
+         (nrow (nrow data-frame))
+         (result-keys-and-element-types
+           (mapcar (lambda (key-and-element-type)
+                     (let+ (((key &optional (element-type t))
+                             (ensure-list key-and-element-type)))
+                       (cons key element-type)))
+                   result-keys))
+         (result-columns (map 'vector
+                              (lambda (key-and-element-type)
+                                (make-array nrow
+                                            :element-type (cdr key-and-element-type)))
+                              result-keys-and-element-types)))
+    (dotimes (index nrow)
+      (let ((result-row (apply function
+                               (mapcar (lambda (column)
+                                         (ref column index))
+                                       columns))))
+        (assert (length= result-row result-columns))
+        (map nil (lambda (result-column result-element)
+                   (setf (aref result-column index) result-element))
+             result-row result-columns)))
+    (make-df (mapcar #'car result-keys-and-element-types) result-columns)))
+
 (defun select-rows (data-frame keys predicate)
   "Return a bit-vector containing the result of calling PREDICATE on rows of
 the columns corresponding to KEYS (0 for NIL, 1 otherwise)."
@@ -487,20 +513,25 @@ KEYS and FUNCTION (using BODY) in functions that map rows.  NOT EXPORTED."
 
 (defmacro mapping-rows ((data-frame bindings &key (element-type t))
                          &body body)
-  "Map rows of DATA-FRAME and return the resulting column (with the given
-ELEMENT-TYPE).  See MAP-ROWS.
+  "Map rows of DATA-FRAME and return the resulting column (with the given ELEMENT-TYPE).  See MAP-ROWS.
 
-BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to
-the VARIABLEs for the columns designated by KEYs."
+BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to the VARIABLEs for the columns designated by KEYs."
   `(map-rows ,data-frame
              ,@(keys-and-lambda-from-bindings bindings body)
              :element-type ,element-type))
 
-(defmacro selecting-rows ((data-frame bindings) &body body)
-  "Map rows using predicate and return the resulting bit vector (see
-SELECT-ROWS).
+(defmacro mapping-df ((data-frame bindings result-keys)
+                      &body body)
+  "Map rows of DATA-FRAME to another data-frame.  See MAP-DF.
 
-BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to
-the VARIABLEs for the columns designated by KEYs."
+BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to the VARIABLEs for the columns designated by KEYs."
+  `(map-df ,data-frame
+             ,@(keys-and-lambda-from-bindings bindings body)
+             ,result-keys))
+
+(defmacro selecting-rows ((data-frame bindings) &body body)
+  "Map rows using predicate and return the resulting bit vector (see SELECT-ROWS).
+
+BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to the VARIABLEs for the columns designated by KEYs."
   `(select-rows ,data-frame
                 ,@(keys-and-lambda-from-bindings bindings body)))
