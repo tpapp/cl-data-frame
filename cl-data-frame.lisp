@@ -437,8 +437,7 @@ TABLE maps keys to indexes, starting from zero."
 ;;; mapping rows and adding columns
 
 (defun map-rows (data-frame keys function &key (element-type t))
-  "Map rows using FUNCTION, on the columns corresponding to KEYS.  Return the
-result with the given ELEMENT-TYPE."
+  "Map rows using FUNCTION, on the columns corresponding to KEYS.  Return the result with the given ELEMENT-TYPE."
   (let ((columns (map 'list (curry #'column data-frame) keys))
         (nrow (nrow data-frame)))
     (aprog1 (make-array nrow :element-type element-type)
@@ -476,8 +475,7 @@ result with the given ELEMENT-TYPE."
     (make-df (mapcar #'car result-keys-and-element-types) result-columns)))
 
 (defun select-rows (data-frame keys predicate)
-  "Return a bit-vector containing the result of calling PREDICATE on rows of
-the columns corresponding to KEYS (0 for NIL, 1 otherwise)."
+  "Return a bit-vector containing the result of calling PREDICATE on rows of the columns corresponding to KEYS (0 for NIL, 1 otherwise)."
   (map-rows data-frame keys (compose (lambda (flag)
                                        (if flag 1 0))
                                      predicate)
@@ -490,9 +488,7 @@ the columns corresponding to KEYS (0 for NIL, 1 otherwise)."
 (defun process-bindings (bindings)
   "Return forms for variables and keys as two values, for use in macros.
 
-BINDINGS is a list of (VARIABLE &optional KEY) forms, where VARIABLE is a
-symbol and KEY is evaluated.  When KEY is not given, it is VARIABLE converted
-to a keyword.
+BINDINGS is a list of (VARIABLE &optional KEY) forms, where VARIABLE is a symbol and KEY is evaluated.  When KEY is not given, it is VARIABLE converted to a keyword.
 
 NOT EXPORTED."
   (let ((alist (mapcar (lambda+ ((variable
@@ -504,8 +500,7 @@ NOT EXPORTED."
             `(list ,@(mapcar #'cdr alist)))))
 
 (defun keys-and-lambda-from-bindings (bindings body)
-  "Process bindings and return a form that can be spliced into the place of
-KEYS and FUNCTION (using BODY) in functions that map rows.  NOT EXPORTED."
+  "Process bindings and return a form that can be spliced into the place of KEYS and FUNCTION (using BODY) in functions that map rows.  NOT EXPORTED."
   (unless body
     (warn "Empty function body."))
   (let+ (((&values variables keys) (process-bindings bindings)))
