@@ -118,8 +118,10 @@
    #:matrix-df
    ;; transformations for data-frames
    #:map-rows
+   #:map-df
    #:select-rows
    #:mapping-rows
+   #:mapping-df
    #:selecting-rows))
 
 (cl:in-package #:cl-data-frame)
