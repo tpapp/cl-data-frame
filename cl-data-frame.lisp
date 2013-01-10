@@ -23,6 +23,12 @@
   (length 0 :type array-index :read-only t)
   (count  0 :type array-index :read-only t))
 
+(defmethod print-object ((summary bit-vector-summary) stream)
+  (let+ (((&structure-r/o bit-vector-summary- length count) summary))
+    (format stream "bits, ones: ~A (~A%)"
+            count
+            (round (/ count length) 1/100))))
+
 (defstruct numeric-vector-summary
   "Summary of a numeric vector."
   (length 0 :type array-index :read-only t)
@@ -33,9 +39,22 @@
   (q75 0 :type real :read-only t)
   (max 0 :type real :read-only t))
 
+(defun ensure-not-ratio (real)
+  "When REAL is a RATIO, convert it to a float, otherwise return as is.  Used for printing."
+  (if (typep real 'ratio)
+      (float real 1.0)
+      real))
+
+(defmethod print-object ((summary numeric-vector-summary) stream)
+  (let+ (((&structure-r/o numeric-vector-summary- real-count min q25 q50 q75 max)
+          summary))
+    (format stream "~A reals, min:~A  q25:~A  q50:~A  q75:~A  max:~A"
+            real-count min (ensure-not-ratio q25)
+            (ensure-not-ratio q50) (ensure-not-ratio q75) max)))
+
 (defun non-numeric-column-summary (column)
   (declare (ignore column))
-  "column is not numeric FIXME need to implement")
+  "column is not numeric FIXME need to implement this summary")
 
 (defgeneric column-summary (column)
   (:documentation "Return an object that summarizes COLUMN of a DATA-FRAME.  Primarily intended for printing, not analysis, returned values should print nicely.")
