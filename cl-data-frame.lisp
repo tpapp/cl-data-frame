@@ -246,6 +246,31 @@ TABLE maps keys to indexes, starting from zero."
   (:documentation "Check if COLUMN is compatible with DATA.")
   (:method ((data data) column)))
 
+(defun ensure-arguments-alist (rest)
+  "Recognizes the following and converts them to an alist:
+
+  plist
+  alist
+  (plist)
+  (alist)
+  (data-frame)"
+  (let+ (((&flet error% (&optional (list rest))
+            (error "Could not interpret ~A as a plist or alist." list)))
+         ((&flet ensure-alist (list)
+            (typecase (car list)
+              (cons rest)
+              (symbol (plist-alist rest))
+              (t (error% list))))))
+    (if (cdr rest)
+        (ensure-alist rest)
+        (let ((first (car rest)))
+          (typecase first
+            (data (as-alist first))
+            (cons (if (consp (cdr first))
+                      (ensure-alist first)
+                      rest))            ; first element of an alist
+            (t (error%)))))))
+
 (defun alist-data (class alist)
   "Create an object of CLASS (subclass of DATA) from ALIST which contains key-column pairs."
   (assert alist () "Can't create an empty data frame.")
@@ -303,17 +328,17 @@ TABLE maps keys to indexes, starting from zero."
     (vector-push-extend column columns))
   data)
 
-(defun add-columns! (data &rest key-and-column-plist)
-  "Modify DATA (a data-frame or data-vector) by adding columns with keys (specified as a plist.  Return DATA."
+(defun add-columns! (data &rest keys-and-columns)
+  "Modify DATA (a data-frame or data-vector) by adding columns with keys (see README about accepted argument formats)."
   (mapc (lambda+ ((key . column))
           (add-column! data key column))
-        (plist-alist key-and-column-plist))
+        (ensure-arguments-alist keys-and-columns))
   data)
 
-(defun add-columns (data &rest key-and-column-plist)
-  "Return a new data-frame or data-vector with keys and columns added.  Does not modify DATA."
+(defun add-columns (data &rest keys-and-columns)
+  "Return a new data-frame or data-vector with keys and columns added.  Does not modify DATA (see README about accepted argument formats)."
   (aprog1 (copy data)
-    (apply #'add-columns! it key-and-column-plist)))
+    (apply #'add-columns! it keys-and-columns)))
 
 (defmacro define-data-subclass (class abbreviation)
   (check-type class symbol)
