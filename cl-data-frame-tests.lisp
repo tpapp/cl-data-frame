@@ -142,25 +142,24 @@ destructive or non-destructive."
          (plist123 (append plist12 plist3)))
     ;; non-destructive
     (let* ((df (plist-df plist12))
-           (df2 (add-map-rows df '(:a :b) #'* :c))
-           (df3 (add-mapping-rows (df :c
-                                   ((a :a)
-                                    (b :b)))
-                  (* a b))))
+           (df2 (add-columns df :c (map-rows df '(:a :b) #'*)))
+           (df3 (add-columns df :c (mapping-rows (df
+                                                  ((a :a)
+                                                   (b :b)))
+                                     (* a b)))))
       (assert-equalp plist12 (as-plist df))
       (assert-equalp plist123 (as-plist df2))
       (assert-equalp plist123 (as-plist df3)))
     ;; destructive, function
     (let* ((df (plist-df plist12))
-           (df2 (add-map-rows! df '(:a :b) #'* :c)))
+           (df2 (add-column! df :c (map-rows df '(:a :b) #'*))))
       (assert-equalp plist123 (as-plist df))
       (assert-equalp plist123 (as-plist df2)))
     ;; destructive, macro
     (let* ((df (plist-df plist12))
-           (df2 (add-mapping-rows! (df :c
-                                    ((a :a)
-                                     (b :b)))
-                  (* a b))))
+           (df2 (add-column! df :c (mapping-rows (df ((a :a)
+                                                      (b :b)))
+                                     (* a b)))))
       (assert-equalp plist123 (as-plist df))
       (assert-equalp plist123 (as-plist df2)))))
 
@@ -168,6 +167,6 @@ destructive or non-destructive."
   (assert-condition warning
       (macroexpand '(mapping-rows (nil nil))))
   (assert-condition warning
-      (macroexpand '(add-mapping-rows (nil nil nil))))
+      (macroexpand '(selecting-rows (nil nil))))
   (assert-condition warning
-      (macroexpand '(add-mapping-rows! (nil nil nil)))))
+      (macroexpand '(mapping-df (nil nil nil)))))
