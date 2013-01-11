@@ -222,8 +222,7 @@ TABLE maps keys to indexes, starting from zero."
     :type ordered-keys)
    (columns
     :initarg :columns
-    :type vector
-    :reader columns))
+    :type vector))
   (:documentation "This class is used for implementing both data-vector and data-matrix, and represents and ordered collection of key-column pairs.  Columns are not assumed to have any specific attributes.  This class is not exported."))
 
 (defun make-data (class keys columns)
@@ -317,6 +316,11 @@ TABLE maps keys to indexes, starting from zero."
   (let+ (((&slots-r/o ordered-keys columns) data))
     (setf (aref columns (key-index ordered-keys key)) column)))
 
+(defun columns (data &optional (slice t))
+  "Return the columns as a vector, or a slice if given (keys are resolved)."
+  (check-type data data)
+  (let+ (((&slots-r/o ordered-keys columns) data))
+    (slice columns (canonical-representation ordered-keys slice))))
 
 (defun add-column! (data key column)
   "Modify DATA (a data-frame or data-vector) by adding COLUMN with KEY.  Return DATA."
