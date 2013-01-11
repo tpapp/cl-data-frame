@@ -353,7 +353,7 @@ TABLE maps keys to indexes, starting from zero."
        (defclass ,class (data)
          ())
        (defun ,(fname '#:make) (keys columns)
-         (make-data 'data-vector keys columns))
+         (make-data ',class keys columns))
        (defun ,alist-fn (alist)
          (alist-data ',class alist))
        (defun ,plist-fn (plist)
