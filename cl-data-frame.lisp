@@ -497,10 +497,11 @@ TABLE maps keys to indexes, starting from zero."
 BINDINGS is a list of (VARIABLE &optional KEY) forms, where VARIABLE is a symbol and KEY is evaluated.  When KEY is not given, it is VARIABLE converted to a keyword.
 
 NOT EXPORTED."
-  (let ((alist (mapcar (lambda+ ((variable
-                                  &optional (key (make-keyword variable))))
-                         (check-type variable symbol)
-                         (cons variable key))
+  (let ((alist (mapcar (lambda (binding)
+                         (let+ (((variable &optional (key (make-keyword variable)))
+                                 (ensure-list binding)))
+                           (check-type variable symbol)
+                           (cons variable key)))
                        bindings)))
     (values (mapcar #'car alist)
             `(list ,@(mapcar #'cdr alist)))))
