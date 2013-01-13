@@ -94,6 +94,7 @@
    #:key-not-found
    ;; generic - both data-vector and data-frame
    #:columns
+   #:map-columns
    #:column
    #:keys
    #:copy
@@ -321,6 +322,10 @@ TABLE maps keys to indexes, starting from zero."
   (check-type data data)
   (let+ (((&slots-r/o ordered-keys columns) data))
     (slice columns (canonical-representation ordered-keys slice))))
+
+(defun map-columns (data function)
+  "Map columns of DATA-FRAME or DATA-VECTOR using FUNCTION.  The result is a new DATA-FRAME with the same keys."
+  (make-data (class-of data) (keys data) (map 'vector function (columns data))))
 
 (defun add-column! (data key column)
   "Modify DATA (a data-frame or data-vector) by adding COLUMN with KEY.  Return DATA."

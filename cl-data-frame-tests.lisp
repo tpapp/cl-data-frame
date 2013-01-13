@@ -28,7 +28,10 @@
     (assert-equalp #(:a :b :c) (keys dv))
     (assert-equalp '((:a . 1) (:b . 2) (:c . 3)) (as-alist dv))
     (assert-equalp '(:a 1 :b 2) (as-plist (slice dv #(:a :b))))
-    (assert-equalp 3 (slice dv :c))))
+    (assert-equalp 3 (slice dv :c))
+    (let ((dv2 (map-columns dv #'1+)))
+      (assert-equalp '(:a 2 :b 3 :c 4) (as-plist dv2))
+      (assert-true (typep dv2 'data-vector)))))
 
 (defsuite data-frame-basics (data-frame))
 
