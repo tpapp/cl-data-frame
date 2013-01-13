@@ -323,9 +323,9 @@ TABLE maps keys to indexes, starting from zero."
   (let+ (((&slots-r/o ordered-keys columns) data))
     (slice columns (canonical-representation ordered-keys slice))))
 
-(defun map-columns (data function)
+(defun map-columns (data function &optional (result-class (class-of data)))
   "Map columns of DATA-FRAME or DATA-VECTOR using FUNCTION.  The result is a new DATA-FRAME with the same keys."
-  (make-data (class-of data) (keys data) (map 'vector function (columns data))))
+  (make-data result-class (keys data) (map 'vector function (columns data))))
 
 (defun add-column! (data key column)
   "Modify DATA (a data-frame or data-vector) by adding COLUMN with KEY.  Return DATA."
