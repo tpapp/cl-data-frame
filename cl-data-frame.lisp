@@ -486,9 +486,7 @@ TABLE maps keys to indexes, starting from zero."
                                        (if flag 1 0))
                                      predicate)
             :element-type 'bit-vector))
-
 
-
 ;;; macros
 
 (defun process-bindings (bindings)
