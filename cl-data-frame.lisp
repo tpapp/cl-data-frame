@@ -79,7 +79,7 @@
 
 
 (cl:defpackage #:cl-data-frame
-  (:nicknames #:data-frame)
+  (:nicknames #:data-frame #:dframe)
   (:use
    #:cl
    #:alexandria
