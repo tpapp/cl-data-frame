@@ -204,8 +204,8 @@ TABLE maps keys to indexes, starting from zero."
   (hash-table-count (ordered-keys-table axis)))
 
 (defmethod canonical-representation ((axis ordered-keys) (slice symbol))
-  (if (eq slice t)
-      (canonical-range 0 (keys-count axis))
+  (if (slice-reserved-symbol? slice)
+      (call-next-method)
       (key-index axis slice)))
 
 (defmethod slice ((ordered-keys ordered-keys) &rest slices)
@@ -233,6 +233,7 @@ TABLE maps keys to indexes, starting from zero."
                         (ordered-keys it)
                         (t (ordered-keys it)))))
     (assert (= n-columns (keys-count ordered-keys)))
+    (assert (subtypep class 'data))
     (make-instance class
                    :ordered-keys ordered-keys
                    :columns (make-array n-columns
@@ -449,7 +450,7 @@ TABLE maps keys to indexes, starting from zero."
 
 (defun map-rows (data-frame keys function &key (element-type t))
   "Map rows using FUNCTION, on the columns corresponding to KEYS.  Return the result with the given ELEMENT-TYPE."
-  (let ((columns (map 'list (curry #'column data-frame) keys))
+  (let ((columns (map 'list (curry #'column data-frame) (ensure-list keys)))
         (nrow (nrow data-frame)))
     (aprog1 (make-array nrow :element-type element-type)
       (dotimes (index nrow)
