@@ -88,10 +88,10 @@
                                   '((:p fixnum) (:m bit)))
                     (vector (* a b) (predicate-bit a b)))))
     (assert-equalp mask
-        (select-rows df '(:a :b) #'predicate))
+        (mask-rows df '(:a :b) #'predicate))
     (assert-equalp mask
-        (selecting-rows (df ((a :a)
-                             (b :b)))
+        (masking-rows (df ((a :a)
+                           (b :b)))
           (predicate a b)))))
 
 (deftest print-object (data-frame-basics)
@@ -170,6 +170,6 @@ destructive or non-destructive."
   (assert-condition warning
       (macroexpand '(mapping-rows (nil nil))))
   (assert-condition warning
-      (macroexpand '(selecting-rows (nil nil))))
+      (macroexpand '(masking-rows (nil nil))))
   (assert-condition warning
       (macroexpand '(mapping-df (nil nil nil)))))
