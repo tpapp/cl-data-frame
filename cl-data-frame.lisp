@@ -119,11 +119,11 @@
    #:matrix-df
    ;; transformations for data-frames
    #:map-rows
+   #:mask-rows
    #:map-df
-   #:select-rows
    #:mapping-rows
    #:mapping-df
-   #:selecting-rows))
+   #:masking-rows))
 
 (cl:in-package #:cl-data-frame)
 
@@ -486,7 +486,7 @@ TABLE maps keys to indexes, starting from zero."
              result-columns result-row)))
     (make-df (mapcar #'car result-keys-and-element-types) result-columns)))
 
-(defun select-rows (data-frame keys predicate)
+(defun mask-rows (data-frame keys predicate)
   "Return a bit-vector containing the result of calling PREDICATE on rows of the columns corresponding to KEYS (0 for NIL, 1 otherwise)."
   (map-rows data-frame keys (compose (lambda (flag)
                                        (if flag 1 0))
@@ -535,8 +535,8 @@ BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to th
              ,@(keys-and-lambda-from-bindings bindings body)
              ,result-keys))
 
-(defmacro selecting-rows ((data-frame bindings) &body body)
-  "Map rows using predicate and return the resulting bit vector (see SELECT-ROWS).
+(defmacro masking-rows ((data-frame bindings) &body body)
+  "Map rows using predicate and return the resulting bit vector (see MASK-ROWS).
 
 BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to the VARIABLEs for the columns designated by KEYs."
   `(select-rows ,data-frame
