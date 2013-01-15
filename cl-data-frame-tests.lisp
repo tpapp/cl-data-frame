@@ -92,7 +92,9 @@
     (assert-equalp mask
         (masking-rows (df ((a :a)
                            (b :b)))
-          (predicate a b)))))
+          (predicate a b)))
+    (assert-equalp (count 1 mask)
+        (count-rows df '(:a :b) #'predicate))))
 
 (deftest print-object (data-frame-basics)
   (let ((df (df :a v :b b :c s)))

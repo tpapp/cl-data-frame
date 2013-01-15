@@ -120,6 +120,7 @@
    ;; transformations for data-frames
    #:map-rows
    #:mask-rows
+   #:count-rows
    #:map-df
    #:mapping-rows
    #:mapping-df
@@ -492,6 +493,16 @@ TABLE maps keys to indexes, starting from zero."
                                        (if flag 1 0))
                                      predicate)
             :element-type 'bit-vector))
+
+(defun count-rows (data-frame keys predicate)
+  "Count the number of rows for which PREDICATE called on the columns corresponding to KEYS returns non-NIL."
+  (let ((columns (map 'list (curry #'column data-frame) (ensure-list keys))))
+    (loop for index below (nrow data-frame)
+          count (apply predicate
+                       (mapcar (lambda (column)
+                                 (ref column index))
+                               columns)))))
+
 
 ;;; macros
 
