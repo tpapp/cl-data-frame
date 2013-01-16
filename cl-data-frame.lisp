@@ -119,6 +119,7 @@
    #:matrix-df
    ;; transformations for data-frames
    #:map-rows
+   #:do-rows
    #:mask-rows
    #:count-rows
    #:map-df
@@ -460,6 +461,16 @@ TABLE maps keys to indexes, starting from zero."
                      (mapcar (lambda (column)
                                (ref column index))
                              columns)))))))
+
+(defun do-rows (data-frame keys function)
+  "Traverse rows from first to last, calling FUNCTION on the columns corresponding to KEYS.  Return no values."
+  (let ((columns (map 'list (curry #'column data-frame) (ensure-list keys)))
+        (nrow (nrow data-frame)))
+    (dotimes (index nrow (values))
+      (apply function
+             (mapcar (lambda (column)
+                       (ref column index))
+                     columns)))))
 
 (defun map-df (data-frame keys function result-keys)
   "Map DATA-FRAME to another one by rows.  Function is called on the columns corresponding to KEYS, and should return a sequence with the same length as RESULT-KEYS, which give the keys of the resulting data frame.  RESULT-KETS should be either symbols, or of the format (symbol &optional (element-type t))."
