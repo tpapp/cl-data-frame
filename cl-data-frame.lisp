@@ -560,5 +560,5 @@ BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to th
   "Map rows using predicate and return the resulting bit vector (see MASK-ROWS).
 
 BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to the VARIABLEs for the columns designated by KEYs."
-  `(select-rows ,data-frame
-                ,@(keys-and-lambda-from-bindings bindings body)))
+  `(mask-rows ,data-frame
+              ,@(keys-and-lambda-from-bindings bindings body)))
