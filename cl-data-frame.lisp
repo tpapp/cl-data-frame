@@ -122,10 +122,7 @@
    #:do-rows
    #:mask-rows
    #:count-rows
-   #:map-df
-   #:mapping-rows
-   #:mapping-df
-   #:masking-rows))
+   #:map-df))
 
 (cl:in-package #:cl-data-frame)
 
@@ -512,53 +509,3 @@ TABLE maps keys to indexes, starting from zero."
                        (mapcar (lambda (column)
                                  (ref column index))
                                columns)))))
-
-
-;;; macros
-
-(defun process-bindings (bindings)
-  "Return forms for variables and keys as two values, for use in macros.
-
-BINDINGS is a list of (VARIABLE &optional KEY) forms, where VARIABLE is a symbol and KEY is evaluated.  When KEY is not given, it is VARIABLE converted to a keyword.
-
-NOT EXPORTED."
-  (let ((alist (mapcar (lambda (binding)
-                         (let+ (((variable &optional (key (make-keyword variable)))
-                                 (ensure-list binding)))
-                           (check-type variable symbol)
-                           (cons variable key)))
-                       bindings)))
-    (values (mapcar #'car alist)
-            `(list ,@(mapcar #'cdr alist)))))
-
-(defun keys-and-lambda-from-bindings (bindings body)
-  "Process bindings and return a form that can be spliced into the place of KEYS and FUNCTION (using BODY) in functions that map rows.  NOT EXPORTED."
-  (unless body
-    (warn "Empty function body."))
-  (let+ (((&values variables keys) (process-bindings bindings)))
-    `(,keys (lambda ,variables ,@body))))
-
-(defmacro mapping-rows ((data-frame bindings &key (element-type t))
-                         &body body)
-  "Map rows of DATA-FRAME and return the resulting column (with the given ELEMENT-TYPE).  See MAP-ROWS.
-
-BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to the VARIABLEs for the columns designated by KEYs."
-  `(map-rows ,data-frame
-             ,@(keys-and-lambda-from-bindings bindings body)
-             :element-type ,element-type))
-
-(defmacro mapping-df ((data-frame bindings result-keys)
-                      &body body)
-  "Map rows of DATA-FRAME to another data-frame.  See MAP-DF.
-
-BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to the VARIABLEs for the columns designated by KEYs."
-  `(map-df ,data-frame
-             ,@(keys-and-lambda-from-bindings bindings body)
-             ,result-keys))
-
-(defmacro masking-rows ((data-frame bindings) &body body)
-  "Map rows using predicate and return the resulting bit vector (see MASK-ROWS).
-
-BINDINGS is a list of (VARIABLE KEY) forms, binding the values in each row to the VARIABLEs for the columns designated by KEYs."
-  `(mask-rows ,data-frame
-              ,@(keys-and-lambda-from-bindings bindings body)))

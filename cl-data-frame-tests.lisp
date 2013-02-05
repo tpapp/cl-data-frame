@@ -73,26 +73,13 @@
          (mask #*011))
     (assert-equalp product
         (map-rows df '(:a :b) #'*))
-    (assert-equalp product
-        (mapping-rows (df ((a :a)
-                           (b :b)))
-          (* a b)))
     (assert-equalp `(:p ,product :m ,mask)
         (as-plist (map-df df '(:a :b)
                           (lambda (a b)
                             (vector (* a b) (predicate-bit a b)))
                           '((:p fixnum) (:m bit)))))
-    (assert-equalp `(:p ,product :m ,mask)
-        (as-plist (mapping-df (df ((a :a)
-                                   (b :b))
-                                  '((:p fixnum) (:m bit)))
-                    (vector (* a b) (predicate-bit a b)))))
     (assert-equalp mask
         (mask-rows df '(:a :b) #'predicate))
-    (assert-equalp mask
-        (masking-rows (df ((a :a)
-                           (b :b)))
-          (predicate a b)))
     (assert-equalp (count 1 mask)
         (count-rows df '(:a :b) #'predicate))))
 
@@ -147,31 +134,11 @@ destructive or non-destructive."
          (plist123 (append plist12 plist3)))
     ;; non-destructive
     (let* ((df (plist-df plist12))
-           (df2 (add-columns df :c (map-rows df '(:a :b) #'*)))
-           (df3 (add-columns df :c (mapping-rows (df
-                                                  ((a :a)
-                                                   (b :b)))
-                                     (* a b)))))
+           (df2 (add-columns df :c (map-rows df '(:a :b) #'*))))
       (assert-equalp plist12 (as-plist df))
-      (assert-equalp plist123 (as-plist df2))
-      (assert-equalp plist123 (as-plist df3)))
+      (assert-equalp plist123 (as-plist df2)))
     ;; destructive, function
     (let* ((df (plist-df plist12))
            (df2 (add-column! df :c (map-rows df '(:a :b) #'*))))
       (assert-equalp plist123 (as-plist df))
-      (assert-equalp plist123 (as-plist df2)))
-    ;; destructive, macro
-    (let* ((df (plist-df plist12))
-           (df2 (add-column! df :c (mapping-rows (df ((a :a)
-                                                      (b :b)))
-                                     (* a b)))))
-      (assert-equalp plist123 (as-plist df))
       (assert-equalp plist123 (as-plist df2)))))
-
-(deftest empty-body-warnings (data-frame-add)
-  (assert-condition warning
-      (macroexpand '(mapping-rows (nil nil))))
-  (assert-condition warning
-      (macroexpand '(masking-rows (nil nil))))
-  (assert-condition warning
-      (macroexpand '(mapping-df (nil nil nil)))))
