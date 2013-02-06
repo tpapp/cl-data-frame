@@ -172,7 +172,7 @@ TABLE maps keys to indexes, starting from zero."
 
 (defmethod print-object ((ordered-keys ordered-keys) stream)
   (print-unreadable-object (ordered-keys stream :type t)
-    (format stream "~{~a~^, ~}" (keys-vector ordered-keys))))
+    (format stream "~{~a~^, ~}" (coerce (keys-vector ordered-keys) 'list))))
 
 (defun add-key! (ordered-keys key)
   "Modify ORDERED-KEYS by adding KEY."
