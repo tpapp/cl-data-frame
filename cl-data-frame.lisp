@@ -111,7 +111,6 @@
    #:dv
    ;; data-frame
    #:data-frame
-   #:nrow
    #:make-df
    #:alist-df
    #:plist-df
@@ -370,6 +369,9 @@ TABLE maps keys to indexes, starting from zero."
 
 (define-data-subclass data-vector dv)
 
+(defmethod aops:dims ((data-vector data-vector))
+  (list (length (columns data-vector))))
+
 (defmethod print-object ((data-vector data-vector) stream)
   (print-unreadable-object (data-vector stream :type t)
     (let ((alist (as-alist data-vector)))
@@ -398,18 +400,22 @@ TABLE maps keys to indexes, starting from zero."
                    rest)
             () "Columns don't have the same length.")))
 
-(defun nrow (data-frame)
-  "Number of rows in DATA-FRAME."
-  (check-type data-frame data-frame)
+(defmethod aops:nrow ((data-frame data-frame))
   (column-length (aref (columns data-frame) 0)))
 
+(defmethod aops:ncol ((data-frame data-frame))
+  (length (columns data-frame)))
+
+(defmethod aops:dims ((data-frame data-frame))
+  (list (aops:nrow data-frame) (aops:ncol data-frame)))
+
 (defmethod check-column-compatibility ((data data-frame) column)
-  (assert (= (column-length column) (nrow data))))
+  (assert (= (column-length column) (aops:nrow data))))
 
 (defmethod print-object ((data-frame data-frame) stream)
   (print-unreadable-object (data-frame stream :type t)
     (let ((alist (as-alist data-frame)))
-      (format stream "~d x ~d" (length alist) (nrow data-frame))
+      (format stream "~d x ~d" (length alist) (aops:nrow data-frame))
       (loop for (key . column) in alist
             do (format stream "~&  ~A  ~A"
                        key (column-summary column))))))
@@ -429,7 +435,7 @@ TABLE maps keys to indexes, starting from zero."
 (defmethod slice ((data-frame data-frame) &rest slices)
   (let+ (((row-slice &optional (column-slice t)) slices)
          ((&slots-r/o ordered-keys columns) data-frame)
-         (row-slice (canonical-representation (nrow data-frame) row-slice))
+         (row-slice (canonical-representation (aops:nrow data-frame) row-slice))
          (column-slice (canonical-representation ordered-keys column-slice))
          (columns (slice columns column-slice))
          ((&flet slice-column (column)
@@ -449,7 +455,7 @@ TABLE maps keys to indexes, starting from zero."
 (defun map-rows (data-frame keys function &key (element-type t))
   "Map rows using FUNCTION, on the columns corresponding to KEYS.  Return the result with the given ELEMENT-TYPE."
   (let ((columns (map 'list (curry #'column data-frame) (ensure-list keys)))
-        (nrow (nrow data-frame)))
+        (nrow (aops:nrow data-frame)))
     (aprog1 (make-array nrow :element-type element-type)
       (dotimes (index nrow)
         (setf (aref it index)
@@ -461,7 +467,7 @@ TABLE maps keys to indexes, starting from zero."
 (defun do-rows (data-frame keys function)
   "Traverse rows from first to last, calling FUNCTION on the columns corresponding to KEYS.  Return no values."
   (let ((columns (map 'list (curry #'column data-frame) (ensure-list keys)))
-        (nrow (nrow data-frame)))
+        (nrow (aops:nrow data-frame)))
     (dotimes (index nrow (values))
       (apply function
              (mapcar (lambda (column)
@@ -471,7 +477,7 @@ TABLE maps keys to indexes, starting from zero."
 (defun map-df (data-frame keys function result-keys)
   "Map DATA-FRAME to another one by rows.  Function is called on the columns corresponding to KEYS, and should return a sequence with the same length as RESULT-KEYS, which give the keys of the resulting data frame.  RESULT-KETS should be either symbols, or of the format (symbol &optional (element-type t))."
   (let* ((columns (map 'list (curry #'column data-frame) keys))
-         (nrow (nrow data-frame))
+         (nrow (aops:nrow data-frame))
          (result-keys-and-element-types
            (mapcar (lambda (key-and-element-type)
                      (let+ (((key &optional (element-type t))
@@ -504,7 +510,7 @@ TABLE maps keys to indexes, starting from zero."
 (defun count-rows (data-frame keys predicate)
   "Count the number of rows for which PREDICATE called on the columns corresponding to KEYS returns non-NIL."
   (let ((columns (map 'list (curry #'column data-frame) (ensure-list keys))))
-    (loop for index below (nrow data-frame)
+    (loop for index below (aops:nrow data-frame)
           count (apply predicate
                        (mapcar (lambda (column)
                                  (ref column index))
