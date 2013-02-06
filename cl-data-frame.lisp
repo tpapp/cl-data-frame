@@ -224,6 +224,9 @@ TABLE maps keys to indexes, starting from zero."
     :type vector))
   (:documentation "This class is used for implementing both data-vector and data-matrix, and represents and ordered collection of key-column pairs.  Columns are not assumed to have any specific attributes.  This class is not exported."))
 
+(defmethod aops:element-type ((data data))
+  t)
+
 (defun make-data (class keys columns)
   "Create a DATA object from KEYS and COLUMNS.  FOR INTERNAL USE.  Always creates a copy of COLUMNS in order to ensure that it is an adjustable array with a fill pointer.  KEYS are converted to ORDERED-KEYS if necessary."
   (let ((n-columns (length columns))
