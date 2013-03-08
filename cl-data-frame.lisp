@@ -375,6 +375,9 @@ TABLE maps keys to indexes, starting from zero."
 (defmethod aops:dims ((data-vector data-vector))
   (list (length (columns data-vector))))
 
+(defmethod aops:as-array ((data-vector data-vector))
+  (columns data-vector))
+
 (defmethod print-object ((data-vector data-vector) stream)
   (print-unreadable-object (data-vector stream :type t)
     (let ((alist (as-alist data-vector)))
@@ -412,6 +415,10 @@ TABLE maps keys to indexes, starting from zero."
 (defmethod aops:dims ((data-frame data-frame))
   (list (aops:nrow data-frame) (aops:ncol data-frame)))
 
+(defmethod aops:as-array ((data-frame data-frame))
+  ;; Return contents of DATA-FRAME as a matrix.
+  (clnu:transpose (aops:combine (columns data-frame))))
+
 (defmethod check-column-compatibility ((data data-frame) column)
   (assert (= (column-length column) (aops:nrow data))))
 
@@ -428,10 +435,6 @@ TABLE maps keys to indexes, starting from zero."
   (let+ ((columns (aops:split (clnu:transpose matrix) 1)))
     (assert (length= columns keys))
     (alist-df (map 'list #'cons keys columns))))
-
-(defun df-matrix (data-frame)
-  "Return contents of DATA-FRAME as a matrix."
-  (clnu:transpose (aops:combine (columns data-frame))))
 
 ;;; implementation of SLICE for DATA-FRAME
 

@@ -93,7 +93,6 @@
   (let ((df (df :a v :b b :c s)))
     (assert-true (with-output-to-string (stream)
                    (print-object df stream)))))
-
 ;;;
 
 (defsuite data-frame-add (data-frame))
