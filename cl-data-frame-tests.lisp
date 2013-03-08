@@ -62,7 +62,12 @@
     (assert-equalp `(:vector ,v) (as-plist (slice df t #(:vector))))
     (assert-equalp `(:vector ,(slice v b)) (as-plist (slice df b #(0))))
     (assert-equalp (slice v b) (slice df b :vector))
-    (assert-equalp '(:vector 3 :symbols c) (as-plist (slice df 2 t)))))
+    (assert-equalp '(:vector 3 :symbols c) (as-plist (slice df 2 t)))
+    (assert-equalp `(:vector #(2 4)) (as-plist
+                                      (slice df
+                                             (mask-rows df :vector #'evenp)
+                                             #(:vector))))
+    (assert-equalp #(2 4) (slice df (mask-rows df :vector #'evenp) :vector))))
 
 (deftest data-frame-map (data-frame-basics)
   (let+ ((df (df :a #(2 3 5)
@@ -78,8 +83,9 @@
                           (lambda (a b)
                             (vector (* a b) (predicate-bit a b)))
                           '((:p fixnum) (:m bit)))))
-    (assert-equalp mask
-        (mask-rows df '(:a :b) #'predicate))
+    (let ((mask-rows (mask-rows df '(:a :b) #'predicate)))
+      (assert-equal mask mask-rows)
+      (assert-eq 'bit (array-element-type mask-rows)))
     (assert-equalp (count 1 mask)
         (count-rows df '(:a :b) #'predicate))))
 

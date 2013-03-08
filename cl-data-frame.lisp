@@ -508,7 +508,7 @@ TABLE maps keys to indexes, starting from zero."
   (map-rows data-frame keys (compose (lambda (flag)
                                        (if flag 1 0))
                                      predicate)
-            :element-type 'bit-vector))
+            :element-type 'bit))
 
 (defun count-rows (data-frame keys predicate)
   "Count the number of rows for which PREDICATE called on the columns corresponding to KEYS returns non-NIL."
