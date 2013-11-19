@@ -18,26 +18,36 @@
   (:method ((column vector))
     (length column)))
 
-(defstruct bit-vector-summary
+(defstruct vector-summary%
+  "Base class for summarizing vectors.  Not exported."
+  (length 0 :type array-index :read-only t))
+
+(defun print-count-and-percentage (stream count length)
+  "Print COUNT as is and also as a rounded percentage of "
+  (format stream "~D (~D%)" count (round (/ count length) 1/100)))
+
+(defstruct (bit-vector-summary (:include vector-summary%))
   "Summary of a bit vector."
-  (length 0 :type array-index :read-only t)
-  (count  0 :type array-index :read-only t))
+  (count 0 :type array-index :read-only t))
 
 (defmethod print-object ((summary bit-vector-summary) stream)
   (let+ (((&structure-r/o bit-vector-summary- length count) summary))
-    (format stream "bits, ones: ~A (~A%)"
-            count
-            (round (/ count length) 1/100))))
+    (princ "bits, ones: " stream)
+    (print-count-and-percentage stream count length)))
 
-(defstruct numeric-vector-summary
-  "Summary of a numeric vector."
-  (length 0 :type array-index :read-only t)
-  (real-count 0 :type array-index :read-only t)
+(defstruct quantiles-summary
+  "Summary of a real elements (using quantiles)."
+  (count 0 :type array-index :read-only t)
   (min 0 :type real :read-only t)
   (q25 0 :type real :read-only t)
   (q50 0 :type real :read-only t)
   (q75 0 :type real :read-only t)
   (max 0 :type real :read-only t))
+
+(defstruct (generic-vector-summary (:include vector-summary%))
+  "Summary for generic vectors."
+  (quantiles nil :type (or null quantiles-summary) :read-only t)
+  (element-count-alist nil :type list :read-only t))
 
 (defun ensure-not-ratio (real)
   "When REAL is a RATIO, convert it to a float, otherwise return as is.  Used for printing."
@@ -45,16 +55,8 @@
       (float real 1.0)
       real))
 
-(defmethod print-object ((summary numeric-vector-summary) stream)
-  (let+ (((&structure-r/o numeric-vector-summary- real-count min q25 q50 q75 max)
-          summary))
-    (format stream "~A reals, min:~A  q25:~A  q50:~A  q75:~A  max:~A"
-            real-count min (ensure-not-ratio q25)
-            (ensure-not-ratio q50) (ensure-not-ratio q75) max)))
-
-(defun non-numeric-column-summary (column)
-  (declare (ignore column))
-  "column is not numeric FIXME need to implement this summary")
+(defparameter *column-summary-quantiles-threshold* 10
+  "If the number of reals exceeds this threshold, they will be summarized with quantiles.")
 
 (defgeneric column-summary (column)
   (:documentation "Return an object that summarizes COLUMN of a DATA-FRAME.  Primarily intended for printing, not analysis, returned values should print nicely.")
@@ -62,20 +64,39 @@
     (make-bit-vector-summary :length (length column) :count (count 1 column)))
   (:method ((column vector))
     (let+ ((length (length column))
-           (elements (loop for elt across column
-                           when (realp elt)
-                           collect elt)))
-      (if (<= (length elements) (/ length 2))
-          (non-numeric-column-summary column)
-          (let+ ((#(min q25 q50 q75 max)
-                   (clnu:quantiles elements #(0 1/4 1/2 3/4 1))))
-            (make-numeric-vector-summary :length (length column)
-                                         :real-count (length elements)
-                                         :min min
-                                         :q25 q25
-                                         :q50 q50
-                                         :q75 q75
-                                         :max max))))))
+           (table (aprog1 (clnu:make-sparse-counter :test #'equal)
+                    (map nil (curry #'clnu:add it) column)))
+           (alist (clnu:sparse-counter-alist table))
+           ((&flet real? (item) (realp (car item))))
+           (reals-alist (remove-if (complement #'real?) alist))
+           (quantiles (when (< *column-summary-quantiles-threshold* (length reals-alist))
+                        (let+ ((#(min q25 q50 q75 max)
+                                 (clnu:weighted-quantiles (mapcar #'car reals-alist)
+                                                          (mapcar #'cdr reals-alist)
+                                                          #(0 1/4 1/2 3/4 1))))
+                          (make-quantiles-summary
+                           :count (reduce #'+ reals-alist :key #'cdr)
+                           :min min :q25 q25 :q50 q50 :q75 q75 :max max))))
+           (alist (stable-sort (if quantiles
+                                   (remove-if #'real? alist)
+                                   alist)
+                               #'>= :key #'cdr)))
+      (make-generic-vector-summary :length length
+                                   :quantiles quantiles
+                                   :element-count-alist alist))))
+
+(defmethod print-object ((summary generic-vector-summary) stream)
+  (let+ (((&structure-r/o generic-vector-summary- length quantiles
+                          element-count-alist) summary))
+    (when quantiles
+      (let+ (((&structure-r/o quantiles-summary- count min q25 q50 q75 max) quantiles))
+        (format stream "~A reals, min=~A  q25=~A  q50=~A  q75=~A  max=~A~%"
+                count min (ensure-not-ratio q25) (ensure-not-ratio q50)
+                (ensure-not-ratio q75) max)))
+    (loop for (element . count) in element-count-alist
+          do (format stream "~A x " element)
+             (print-count-and-percentage stream count length)
+             (terpri stream))))
 
 
 (cl:defpackage #:cl-data-frame
