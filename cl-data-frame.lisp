@@ -88,15 +88,23 @@
 (defmethod print-object ((summary generic-vector-summary) stream)
   (let+ (((&structure-r/o generic-vector-summary- length quantiles
                           element-count-alist) summary))
-    (when quantiles
-      (let+ (((&structure-r/o quantiles-summary- count min q25 q50 q75 max) quantiles))
-        (format stream "~A reals, min=~A  q25=~A  q50=~A  q75=~A  max=~A~%"
-                count min (ensure-not-ratio q25) (ensure-not-ratio q50)
-                (ensure-not-ratio q75) max)))
-    (loop for (element . count) in element-count-alist
-          do (format stream "~A x " element)
-             (print-count-and-percentage stream count length)
-             (terpri stream))))
+    (pprint-logical-block (stream nil)
+      (pprint-indent :current 0 stream)
+      (when quantiles
+        (let+ (((&structure-r/o quantiles-summary- count min q25 q50 q75 max) quantiles))
+          (format stream "~W reals, min=~W, ~@_q25=~W, ~@_q50=~W, ~@_q75=~W, ~@_max=~W"
+                  count min (ensure-not-ratio q25) (ensure-not-ratio q50)
+                  (ensure-not-ratio q75) max)))
+      (pprint-logical-block (stream element-count-alist)
+        (loop (pprint-exit-if-list-exhausted)
+              (when quantiles
+                (format stream ", ~@_"))
+              (let+ (((element . count) (pprint-pop)))
+                (print-count-and-percentage stream count length)
+                (format stream " x ~W" element))
+              (pprint-exit-if-list-exhausted)
+              (princ ", " stream)
+              (pprint-newline :linear stream) )))))
 
 
 (cl:defpackage #:cl-data-frame
@@ -444,12 +452,14 @@ TABLE maps keys to indexes, starting from zero."
   (assert (= (column-length column) (aops:nrow data))))
 
 (defmethod print-object ((data-frame data-frame) stream)
-  (print-unreadable-object (data-frame stream :type t)
-    (let ((alist (as-alist data-frame)))
-      (format stream "~d x ~d" (length alist) (aops:nrow data-frame))
-      (loop for (key . column) in alist
-            do (format stream "~&  ~A  ~A"
-                       key (column-summary column))))))
+  (let ((alist (as-alist data-frame)))
+    (pprint-logical-block (stream alist)
+      (print-unreadable-object (data-frame stream :type t)
+        (format stream "~d x ~d" (length alist) (aops:nrow data-frame))
+        (loop (pprint-exit-if-list-exhausted)
+              (pprint-newline :mandatory stream)
+              (let+ (((key . column) (pprint-pop)))
+                (format stream "~W ~W" key (column-summary column))))))))
 
 (defun matrix-df (keys matrix)
   "Convert a matrix to a data-frame with the given keys."
