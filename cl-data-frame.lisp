@@ -408,12 +408,15 @@ TABLE maps keys to indexes, starting from zero."
   (columns data-vector))
 
 (defmethod print-object ((data-vector data-vector) stream)
-  (print-unreadable-object (data-vector stream :type t)
-    (let ((alist (as-alist data-vector)))
-      (format stream "~d" (length alist))
-      (loop for (key . column) in alist
-            do (format stream "~&  ~A  ~A"
-                       key column)))))
+  (let ((alist (as-alist data-vector)))
+    (pprint-logical-block (stream alist)
+      (print-unreadable-object (data-vector stream :type t)
+        (format stream "(~d)" (length alist))
+        (loop (pprint-exit-if-list-exhausted)
+              (let+ (((key . column) (pprint-pop)))
+                (format stream "~_ ~W ~W" key column))
+              (pprint-exit-if-list-exhausted)
+              (princ "," stream))))))
 
 (defmethod slice ((data-vector data-vector) &rest slices)
   (let+ (((column-slice) slices)
@@ -455,7 +458,7 @@ TABLE maps keys to indexes, starting from zero."
   (let ((alist (as-alist data-frame)))
     (pprint-logical-block (stream alist)
       (print-unreadable-object (data-frame stream :type t)
-        (format stream "~d x ~d" (length alist) (aops:nrow data-frame))
+        (format stream "(~d x ~d)" (length alist) (aops:nrow data-frame))
         (loop (pprint-exit-if-list-exhausted)
               (pprint-newline :mandatory stream)
               (let+ (((key . column) (pprint-pop)))
