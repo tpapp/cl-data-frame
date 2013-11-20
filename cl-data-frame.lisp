@@ -151,6 +151,7 @@
    #:plist-df
    #:df
    #:matrix-df
+   #:*column-summary-minimum-length*
    ;; transformations for data-frames
    #:map-rows
    #:do-rows
@@ -460,15 +461,20 @@ TABLE maps keys to indexes, starting from zero."
 (defmethod check-column-compatibility ((data data-frame) column)
   (assert (= (column-length column) (aops:nrow data))))
 
+(defparameter *column-summary-minimum-length* 10
+  "Columns are only summarized when longer than this, otherwise they are returned as is.")
 (defmethod print-object ((data-frame data-frame) stream)
-  (let ((alist (as-alist data-frame)))
+  (let ((alist (as-alist data-frame))
+        (summarize? (<= *column-summary-minimum-length* (aops:nrow data-frame))))
     (pprint-logical-block (stream alist)
       (print-unreadable-object (data-frame stream :type t)
         (format stream "(~d x ~d)" (length alist) (aops:nrow data-frame))
         (loop (pprint-exit-if-list-exhausted)
               (pprint-newline :mandatory stream)
               (let+ (((key . column) (pprint-pop)))
-                (format stream "~W ~W" key (column-summary column))))))))
+                (format stream "~W ~W" key (if summarize?
+                                               (column-summary column)
+                                               column))))))))
 
 (defun matrix-df (keys matrix)
   "Convert a matrix to a data-frame with the given keys."
