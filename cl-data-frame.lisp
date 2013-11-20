@@ -91,22 +91,26 @@
   (let+ (((&structure-r/o generic-vector-summary- length quantiles
                           element-count-alist) summary))
     (pprint-logical-block (stream nil)
-      (pprint-indent :current 0 stream)
-      (when quantiles
-        (let+ (((&structure-r/o quantiles-summary- count min q25 q50 q75 max) quantiles))
-          (format stream "~W reals, min=~W, ~@_q25=~W, ~@_q50=~W, ~@_q75=~W, ~@_max=~W"
-                  count min (ensure-not-ratio q25) (ensure-not-ratio q50)
-                  (ensure-not-ratio q75) max)))
+      (pprint-logical-block (stream nil)
+        (when quantiles
+          (let+ (((&structure-r/o quantiles-summary- count min q25 q50 q75 max)
+                  quantiles))
+            (format stream
+                    "~W reals, ~:_min=~W, ~:_q25=~W, ~:_q50=~W, ~:_q75=~W, ~:_max=~W"
+                    count min (ensure-not-ratio q25) (ensure-not-ratio q50)
+                    (ensure-not-ratio q75) max))))
+      (when (and quantiles element-count-alist)
+        (format stream "; ")
+        (pprint-newline :linear stream))
       (pprint-logical-block (stream element-count-alist)
         (loop (pprint-exit-if-list-exhausted)
-              (when quantiles
-                (format stream ", ~@_"))
+              ;; (when quantiles
+              ;;   (format stream ", ~@_"))
               (let+ (((element . count) (pprint-pop)))
                 (print-count-and-percentage stream count length)
                 (format stream " x ~W" element))
               (pprint-exit-if-list-exhausted)
-              (princ ", " stream)
-              (pprint-newline :linear stream) )))))
+              (format stream ", ~_"))))))
 
 
 (cl:defpackage #:cl-data-frame
