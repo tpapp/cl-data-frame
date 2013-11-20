@@ -147,3 +147,22 @@ destructive or non-destructive."
            (df2 (add-column! df :c (map-rows df '(:a :b) #'*))))
       (assert-equalp plist123 (as-plist df))
       (assert-equalp plist123 (as-plist df2)))))
+
+;;; replace-column
+
+(defsuite replace-column (data-frame))
+
+(deftest replace-column1 (replace-column)
+  (let* ((plist '(:a #(1 2 3) :b #(5 7 11)))
+         (df (plist-df plist))
+         (df-copy (copy df))
+         (df1 (replace-column df :a #'1+))
+         (df2 (replace-column df :a #(2 3 4)))
+         (expected-plist '(:a #(2 3 4) :b #(5 7 11))))
+    (assert-equalp expected-plist (as-plist df1))
+    (assert-equalp expected-plist (as-plist df2))
+    (assert-equalp plist (as-plist df))
+    ;; modify destructively
+    (replace-column! df :a #'1+)
+    (assert-false (equalp plist (as-plist df)))
+    (assert-equalp expected-plist (as-plist df))))

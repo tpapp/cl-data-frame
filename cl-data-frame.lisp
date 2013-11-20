@@ -157,7 +157,9 @@
    #:do-rows
    #:mask-rows
    #:count-rows
-   #:map-df))
+   #:map-df
+   #:replace-column!
+   #:replace-column))
 
 (cl:in-package #:cl-data-frame)
 
@@ -567,3 +569,18 @@ TABLE maps keys to indexes, starting from zero."
                        (mapcar (lambda (column)
                                  (ref column index))
                                columns)))))
+
+(defun replace-column! (data key function-or-column &key (element-type t))
+  "Modify column KEY of data-frame DATE by replacing it either with the given column, or applying the function to the current values (ELEMENT-TYPE is used.)"
+  (let+ (((&slots ordered-keys columns) data)
+         (index (key-index ordered-keys key)))
+    (setf (aref columns index)
+          (if (functionp function-or-column)
+              (map-rows data key function-or-column :element-type element-type)
+              (prog1 function-or-column
+                (check-column-compatibility data function-or-column)))))
+  data)
+
+(defun replace-column (data key function-or-column &key (element-type t))
+  "Create a new data frame by with new column KEY from data-frame DATE by replacing it either with the given column, or applying the function to the current values (ELEMENT-TYPE is used.)"
+  (replace-column! (copy data) key function-or-column :element-type element-type))
