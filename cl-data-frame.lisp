@@ -69,11 +69,13 @@
            (alist (clnu:sparse-counter-alist table))
            ((&flet real? (item) (realp (car item))))
            (reals-alist (remove-if (complement #'real?) alist))
-           (quantiles (when (< *column-summary-quantiles-threshold* (length reals-alist))
+           (quantiles (when (< *column-summary-quantiles-threshold*
+                               (length reals-alist))
                         (let+ ((#(min q25 q50 q75 max)
-                                 (clnu:weighted-quantiles (mapcar #'car reals-alist)
-                                                          (mapcar #'cdr reals-alist)
-                                                          #(0 1/4 1/2 3/4 1))))
+                                 (clnu:weighted-quantiles
+                                  (mapcar #'car reals-alist)
+                                  (mapcar #'cdr reals-alist)
+                                  #(0 1/4 1/2 3/4 1))))
                           (make-quantiles-summary
                            :count (reduce #'+ reals-alist :key #'cdr)
                            :min min :q25 q25 :q50 q50 :q75 q75 :max max))))
