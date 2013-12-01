@@ -92,6 +92,8 @@
 (defmethod print-object ((summary generic-vector-summary) stream)
   (let+ (((&structure-r/o generic-vector-summary- length quantiles
                           element-count-alist) summary))
+    #+sbcl ;; complains about unreachable code
+    (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
     (pprint-logical-block (stream nil)
       (pprint-logical-block (stream nil)
         (when quantiles
