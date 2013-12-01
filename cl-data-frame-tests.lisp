@@ -9,8 +9,8 @@
    #:let-plus
    #:cl-slice
    #:cl-data-frame)
-  (:export
-   #:run))
+  (:import-from #:clnu #:as-alist #:as-plist)
+  (:export #:run))
 
 (cl:in-package #:cl-data-frame-tests)
 

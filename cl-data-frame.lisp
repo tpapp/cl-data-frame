@@ -127,6 +127,7 @@
    #:cl-data-frame.column
    #:cl-slice
    #:cl-slice-dev)
+  (:import-from #:clnu #:as-alist)
   (:export
    ;; error messages for ordered keys
    #:duplicate-key
@@ -331,7 +332,6 @@ TABLE maps keys to indexes, starting from zero."
 
 (defmethod as-alist ((data data))
   "Key-column pairs as an alist."
-  (check-type data data)
   (map 'list #'cons (keys data) (columns data)))
 
 (defun copy (data &key (key #'identity))
