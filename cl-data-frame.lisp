@@ -9,7 +9,9 @@
         #:let-plus)
   (:export
    #:column-length
-   #:column-summary))
+   #:column-summary)
+  (:import-from #:clnu
+                #:as-alist))
 
 (cl:in-package #:cl-data-frame.column)
 
@@ -66,7 +68,7 @@
     (let+ ((length (length column))
            (table (aprog1 (clnu:make-sparse-counter :test #'equal)
                     (map nil (curry #'clnu:add it) column)))
-           (alist (clnu:sparse-counter-alist table))
+           (alist (as-alist table))
            ((&flet real? (item) (realp (car item))))
            (reals-alist (remove-if (complement #'real?) alist))
            (quantiles (when (< *column-summary-quantiles-threshold*
@@ -81,7 +83,7 @@
                            :min min :q25 q25 :q50 q50 :q75 q75 :max max))))
            (alist (stable-sort (if quantiles
                                    (remove-if #'real? alist)
-                                   alist)
+                                   (copy-list alist))
                                #'>= :key #'cdr)))
       (make-generic-vector-summary :length length
                                    :quantiles quantiles
@@ -133,8 +135,6 @@
    #:column
    #:keys
    #:copy
-   #:as-alist
-   #:as-plist
    #:add-columns
    #:add-column!
    #:add-columns!
@@ -327,15 +327,10 @@ TABLE maps keys to indexes, starting from zero."
   (check-type data data)
   (copy-seq (keys-vector (slot-value data 'ordered-keys))))
 
-(defun as-alist (data)
+(defmethod as-alist ((data data))
   "Key-column pairs as an alist."
   (check-type data data)
   (map 'list #'cons (keys data) (columns data)))
-
-(defun as-plist (data)
-  "Key-column pairs as a plist."
-  (check-type data data)
-  (alist-plist (as-alist data)))
 
 (defun copy (data &key (key #'identity))
   "Copy data frame or vector.  Keys are copied (and thus can be modified), columns or elements are copyied using KEY, making the default give a shallow copy."
