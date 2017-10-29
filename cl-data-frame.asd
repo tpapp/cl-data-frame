@@ -4,7 +4,7 @@
   :long-description "FIXME"
   :maintainer "Tamas Papp <tkpapp@gmail.com>"
   :author "Tamas Papp <tkpapp@gmail.com>"
-  :licence "BOOST"
+  :licence "MIT"
   :depends-on (#:alexandria
                #:anaphora
                #:array-operations
@@ -19,7 +19,7 @@
   :description "Unit tests for CL-DATA-FRAME."
   :maintainer "Tamas Papp <tkpapp@gmail.com>"
   :author "Tamas Papp <tkpapp@gmail.com>"
-  :licence "BOOST"
+  :licence "MIT"
   :depends-on (#:cl-data-frame
                #:clunit)
   :serial t
