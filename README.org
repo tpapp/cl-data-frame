@@ -1,6 +1,9 @@
 #+CAPTION: Project Status: Abandoned – Initial development has started, but there has not yet been a stable, usable release; the project has been abandoned and the author(s) do not intend on continuing development.
 [[http://www.repostatus.org/badges/latest/abandoned.svg]]
 
+This repository is *archived*. You may find an updated version of these
+libraries at https://github.com/Lisp-Stat/
+
 * Data frames for Common Lisp
 
 /I need to write this, for now just look at the unit tests which have plenty of examples./
